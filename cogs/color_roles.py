@@ -69,20 +69,15 @@ class ColorButton(discord.ui.Button):
         # Toggle off if clicking same color
         if target_role in current_roles:
             await member.edit(roles=roles_to_keep, reason=f"Removed {self.color_info['name']} color")
-            await interaction.response.send_message(
-                f"⚪ Removed **{self.color_info['name']}** color. Your name color is reset!",
-                ephemeral=True
-            )
+            await interaction.response.defer()
             return
 
         # Instant atomic 1-call swap
         final_roles = roles_to_keep + [target_role]
         await member.edit(roles=final_roles, reason=f"Selected {self.color_info['name']} color")
 
-        await interaction.response.send_message(
-            f"🎨 Your name color has been updated to **{self.color_info['name']}**!",
-            ephemeral=True
-        )
+        # Silent acknowledgement (no chat message/popup sent to anyone)
+        await interaction.response.defer()
 
 
 class ResetButton(discord.ui.Button):
@@ -105,9 +100,7 @@ class ResetButton(discord.ui.Button):
 
         if len(roles_to_keep) != len(current_roles):
             await member.edit(roles=roles_to_keep, reason="Reset color to default")
-            await interaction.response.send_message("⚪ Reverted to default username color!", ephemeral=True)
-        else:
-            await interaction.response.send_message("You already have the default name color!", ephemeral=True)
+        await interaction.response.defer()
 
 
 class ColorRoleView(discord.ui.View):
