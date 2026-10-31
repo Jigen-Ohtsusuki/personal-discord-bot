@@ -185,6 +185,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
   let badge = "🎬 NEW VIDEO";
   let buttonLabel = "▶ Watch Video";
   let videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  let scheduledTimeField = null;
 
   // Check if it's a Short (200 on /shorts/ID, 303 redirect for videos)
   try {
@@ -228,6 +229,17 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
           embedColor = 0xF1C40F;
           badge = "📅 SCHEDULED STREAM";
           buttonLabel = "⏰ Set Reminder / View";
+
+          // Extract real scheduled start time from YouTube
+          const rawTime = liveDetails?.startTimestamp || liveDetails?.scheduledStartTime;
+          if (rawTime) {
+            const unixSec = Math.floor(new Date(rawTime).getTime() / 1000);
+            scheduledTimeField = {
+              name: "📅 Scheduled Start Time",
+              value: `<t:${unixSec}:F>\n👉 **Countdown:** <t:${unixSec}:R>`,
+              inline: false
+            };
+          }
         }
       }
     } catch (e) {}
@@ -238,6 +250,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
     title: `${badge} • ${rawTitle}`,
     url: videoUrl,
     color: embedColor,
+    fields: scheduledTimeField ? [scheduledTimeField] : [],
     author: {
       name: creator,
       url: `https://www.youtube.com/channel/${channelId}`,
