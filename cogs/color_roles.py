@@ -89,12 +89,23 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         logger.info(f"Posted fresh Color Role Menu in #{channel.name} ({msg.id})")
         return msg
 
-    def _get_color_info(self, emoji: discord.PartialEmoji) -> Optional[Dict[str, Any]]:
-        """Resolves an emoji to its color definition."""
-        if emoji.id and emoji.id in COLOR_LOOKUP:
-            return COLOR_LOOKUP[emoji.id]
-        if emoji.name and emoji.name in COLOR_LOOKUP:
-            return COLOR_LOOKUP[emoji.name]
+    def _get_color_info(self, emoji: Any) -> Optional[Dict[str, Any]]:
+        """Resolves an emoji (str, PartialEmoji, or Emoji) to its color definition."""
+        if isinstance(emoji, str):
+            return COLOR_LOOKUP.get(emoji)
+
+        emoji_id = getattr(emoji, "id", None)
+        if emoji_id and emoji_id in COLOR_LOOKUP:
+            return COLOR_LOOKUP[emoji_id]
+
+        emoji_name = getattr(emoji, "name", None)
+        if emoji_name and emoji_name in COLOR_LOOKUP:
+            return COLOR_LOOKUP[emoji_name]
+
+        emoji_str = str(emoji)
+        if emoji_str in COLOR_LOOKUP:
+            return COLOR_LOOKUP[emoji_str]
+
         return None
 
     @commands.Cog.listener()
@@ -152,29 +163,30 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
             except Exception as e:
                 logger.error(f"Error removing roles from {member.display_name}: {e}")
 
-        # 2. Remove member's previous color reactions from this message
-        if message:
-            for r in message.reactions:
-                reaction_color = self._get_color_info(r.emoji)
-                if reaction_color and reaction_color["id"] != target_info["id"]:
-                    try:
-                        await message.remove_reaction(r.emoji, member)
-                    except discord.Forbidden:
-                        logger.warning("PERMISSION ERROR: Bot needs 'Manage Messages' permission to remove old reactions.")
-                    except Exception:
-                        pass
-
-        # 3. Add the new color role
+        # 2. Add the new color role immediately
         if target_role:
             try:
                 await member.add_roles(target_role, reason=f"Selected {target_role.name} color")
-                logger.info(f"Assigned color role '{target_role.name}' to {member.display_name}")
+                logger.info(f"✨ Successfully assigned color role '{target_role.name}' to {member.display_name}")
             except discord.Forbidden:
                 logger.warning(
-                    f"PERMISSION ERROR: Bot cannot assign '{target_role.name}'! Please move 'Jey's Bot 💜' role ABOVE '{target_role.name}' in Server Settings -> Roles and grant 'Manage Roles'."
+                    f"PERMISSION ERROR: Bot cannot assign '{target_role.name}'! Please verify 'Jey's Bot 💜' role is above '{target_role.name}' and has 'Manage Roles'."
                 )
             except Exception as e:
                 logger.error(f"Error adding role {target_role.name} to {member.display_name}: {e}")
+
+        # 3. Clean up member's previous color reactions from this message
+        if message:
+            for r in message.reactions:
+                try:
+                    reaction_color = self._get_color_info(r.emoji)
+                    if reaction_color and reaction_color["id"] != target_info["id"]:
+                        await message.remove_reaction(r.emoji, member)
+                        logger.debug(f"Removed reaction {r.emoji} from {member.display_name}")
+                except discord.Forbidden:
+                    logger.warning("PERMISSION ERROR: Bot needs 'Manage Messages' permission to remove old reactions.")
+                except Exception as e:
+                    logger.debug(f"Could not remove old reaction: {e}")
 
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
