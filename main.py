@@ -48,7 +48,8 @@ class GamingBot(commands.Bot):
         # 2. Load Cogs
         initial_extensions = [
             "cogs.youtube",
-            "cogs.color_roles"
+            "cogs.color_roles",
+            "cogs.game_roles"
         ]
 
         for extension in initial_extensions:
