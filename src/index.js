@@ -52,6 +52,55 @@ export default {
       });
     }
 
+    // Diagnostic / Test Endpoint (GET /test-discord)
+    if (url.pathname.endsWith("/test-discord")) {
+      const status = {
+        DISCORD_WEBHOOK_LIVE: env.DISCORD_WEBHOOK_LIVE ? "Configured ✅" : "Missing ❌",
+        DISCORD_WEBHOOK_VIDEOS: env.DISCORD_WEBHOOK_VIDEOS ? "Configured ✅" : "Missing ❌",
+        DISCORD_WEBHOOK_SHORTS: env.DISCORD_WEBHOOK_SHORTS ? "Configured ✅" : "Missing ❌"
+      };
+
+      let sent = [];
+      if (env.DISCORD_WEBHOOK_SHORTS) {
+        await fetch(env.DISCORD_WEBHOOK_SHORTS, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: "Jey's Bot 💜",
+            content: "🎉 **Jey's Bot 💜 is active 24/7 on Cloudflare!** Test alert delivered to `#shorts`."
+          })
+        });
+        sent.push("#shorts ✅");
+      }
+      if (env.DISCORD_WEBHOOK_VIDEOS) {
+        await fetch(env.DISCORD_WEBHOOK_VIDEOS, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: "Jey's Bot 💜",
+            content: "🎉 **Jey's Bot 💜 is active 24/7 on Cloudflare!** Test alert delivered to `#videos`."
+          })
+        });
+        sent.push("#videos ✅");
+      }
+      if (env.DISCORD_WEBHOOK_LIVE) {
+        await fetch(env.DISCORD_WEBHOOK_LIVE, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: "Jey's Bot 💜",
+            content: "🎉 **Jey's Bot 💜 is active 24/7 on Cloudflare!** Test alert delivered to `#live-streams`."
+          })
+        });
+        sent.push("#live-streams ✅");
+      }
+
+      return new Response(JSON.stringify({ variables: status, test_messages: sent }, null, 2), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
     // 3. Incoming Real-Time Push Notification (POST)
     if (request.method === "POST" && (url.pathname.endsWith("/webhook") || url.pathname.endsWith("/youtube/webhook"))) {
       const text = await request.text();
