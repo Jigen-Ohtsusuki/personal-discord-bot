@@ -28,6 +28,8 @@ logger = logging.getLogger("DiscordBot")
 intents = discord.Intents.default()
 intents.guilds = True
 intents.messages = True
+intents.reactions = True
+intents.members = True
 
 class GamingBot(commands.Bot):
     def __init__(self):
@@ -45,7 +47,8 @@ class GamingBot(commands.Bot):
 
         # 2. Load Cogs
         initial_extensions = [
-            "cogs.youtube"
+            "cogs.youtube",
+            "cogs.color_roles"
         ]
 
         for extension in initial_extensions:
