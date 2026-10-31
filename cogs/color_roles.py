@@ -20,6 +20,7 @@ COLOR_DEFINITIONS = [
 ALL_COLOR_ROLE_IDS = {c["id"] for c in COLOR_DEFINITIONS}
 ROLE_ID_TO_UNICODE = {c["id"]: c["emoji"] for c in COLOR_DEFINITIONS}
 COLOR_LOOKUP: Dict[str, Dict[str, Any]] = {c["emoji"]: c for c in COLOR_DEFINITIONS}
+COLOR_NAMES = {c["name"].lower(): c for c in COLOR_DEFINITIONS}
 ROLES_CHANNEL_ID = 1559330910132764782  # #roles
 
 
@@ -39,17 +40,61 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        """Discovers existing menu in #roles."""
+        """Discovers or auto-provisions menu in #roles across any connected server."""
         await self.bot.wait_until_ready()
-        channel = self.bot.get_channel(ROLES_CHANNEL_ID)
-        if not channel:
-            return
+        for guild in self.bot.guilds:
+            channel = self.bot.get_channel(ROLES_CHANNEL_ID) or discord.utils.get(guild.text_channels, name="roles")
+            if not channel:
+                continue
 
-        async for msg in channel.history(limit=15):
-            if msg.author.id == self.bot.user.id and msg.embeds and "Choose Your Name Color" in (msg.embeds[0].title or ""):
-                self.menu_message_id = msg.id
-                logger.info(f"Color Role Reaction Menu active on message ID: {msg.id}")
-                return
+            found = False
+            async for msg in channel.history(limit=15):
+                if msg.author.id == self.bot.user.id and msg.embeds and "Choose Your Name Color" in (msg.embeds[0].title or ""):
+                    self.menu_message_id = msg.id
+                    found = True
+                    logger.info(f"Color Role Reaction Menu active in '{guild.name}' #{channel.name} (ID: {msg.id})")
+                    break
+
+            if not found and guild.me.guild_permissions.send_messages:
+                # Auto-deploy menu in new server
+                await self.post_color_menu(channel)
+
+    async def post_color_menu(self, channel: discord.TextChannel) -> discord.Message:
+        """Posts clean color picker embed in the target channel."""
+        embed = discord.Embed(
+            title="🎨 Choose Your Name Color!",
+            description=(
+                "Personalize your appearance in the server! React with an emoji below to change your username color.\n\n"
+                "**Available Colors:**\n"
+                "🔴 **Red** (`#ff8890`)\n"
+                "🟣 **Purple** (`#aa88ff`)\n"
+                "🟢 **Green** (`#88ff90`)\n"
+                "🌸 **Pink** (`#fe88ff`)\n"
+                "🟠 **Orange** (`#ffa788`)\n"
+                "🟡 **Yellow** (`#f5ff88`)\n"
+                "🔵 **Blue** (`#88eaff`)\n\n"
+                "✨ **Exclusive:** You can only have **one color at a time**. Reacting to a new color will automatically remove your old reaction and switch your color!"
+            ),
+            color=0xAA88FF
+        )
+        embed.set_footer(text="Jey's Bot 💜 • Exclusive Color Role Engine")
+        msg = await channel.send(embed=embed)
+        self.menu_message_id = msg.id
+
+        for c in COLOR_DEFINITIONS:
+            try:
+                await msg.add_reaction(c["emoji"])
+                await asyncio.sleep(0.3)
+            except Exception as e:
+                logger.debug(f"Reaction error: {e}")
+        return msg
+
+    def _resolve_target_role(self, guild: discord.Guild, target_info: Dict[str, Any]) -> Optional[discord.Role]:
+        """Finds role by ID or by name (case-insensitive) for seamless multi-server portability."""
+        role = guild.get_role(target_info["id"])
+        if not role:
+            role = discord.utils.get(guild.roles, name=target_info["name"])
+        return role
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
@@ -81,12 +126,21 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
             return
 
         async with self._get_user_lock(member.id):
-            target_role = guild.get_role(target_info["id"])
+            target_role = self._resolve_target_role(guild, target_info)
             current_roles = list(member.roles)
 
-            # Identify old color roles and emojis to strip
-            roles_being_removed = [r for r in current_roles if r.id in ALL_COLOR_ROLE_IDS and (target_role is None or r.id != target_role.id)]
-            old_emojis_to_remove = [ROLE_ID_TO_UNICODE[r.id] for r in roles_being_removed if r.id in ROLE_ID_TO_UNICODE]
+            # Identify old color roles and emojis to strip (by ID or by name)
+            roles_being_removed = [
+                r for r in current_roles
+                if (r.id in ALL_COLOR_ROLE_IDS or r.name.lower() in COLOR_NAMES)
+                and (target_role is None or r.id != target_role.id)
+            ]
+            old_emojis_to_remove = []
+            for r in roles_being_removed:
+                if r.id in ROLE_ID_TO_UNICODE:
+                    old_emojis_to_remove.append(ROLE_ID_TO_UNICODE[r.id])
+                elif r.name.lower() in COLOR_NAMES:
+                    old_emojis_to_remove.append(COLOR_NAMES[r.name.lower()]["emoji"])
 
             # 1. Instantly remove previous reaction to clear old blue highlight
             for old_emoji in old_emojis_to_remove:
@@ -101,8 +155,8 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
                     )
 
             # 2. Update role in one atomic call
-            roles_to_keep = [r for r in current_roles if r.id not in ALL_COLOR_ROLE_IDS]
-            final_roles = roles_to_keep + ([target_role] if target_role else [])
+            roles_to_keep = [r for r in current_roles if r not in roles_being_removed]
+            final_roles = roles_to_keep + ([target_role] if target_role and target_role not in roles_to_keep else [])
 
             if set(final_roles) != set(current_roles):
                 try:
@@ -138,7 +192,7 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         if not member or member.bot:
             return
 
-        target_role = guild.get_role(target_info["id"])
+        target_role = self._resolve_target_role(guild, target_info)
         if target_role and target_role in member.roles:
             try:
                 await member.remove_roles(target_role, reason="Unreacted color role")
