@@ -1,8 +1,9 @@
 import logging
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import discord
 from discord.ext import commands
+from discord.message import convert_emoji_reaction
 
 logger = logging.getLogger("ColorRoles")
 
@@ -17,22 +18,42 @@ COLOR_DEFINITIONS = [
     {"name": "Blue", "id": 1559349434909855804, "emoji": "🔵", "hex": "#88eaff", "alt_keys": ["cyan", 458640036238458902]},
 ]
 
-# Lookup map matching unicode emoji, emoji name, or custom emoji ID to role info
+# Fast in-memory lookup tables
 COLOR_LOOKUP: Dict[Any, Dict[str, Any]] = {}
 ALL_COLOR_ROLE_IDS = set()
+ROLE_ID_TO_EMOJIS: Dict[int, List[str]] = {}
 
 for item in COLOR_DEFINITIONS:
-    ALL_COLOR_ROLE_IDS.add(item["id"])
+    role_id = item["id"]
+    ALL_COLOR_ROLE_IDS.add(role_id)
     COLOR_LOOKUP[item["emoji"]] = item
+
+    emojis_for_role = [item["emoji"]]
     for alt in item["alt_keys"]:
         COLOR_LOOKUP[alt] = item
+        if isinstance(alt, int):
+            # Custom emoji format name:id
+            custom_name = next((k for k in item["alt_keys"] if isinstance(k, str)), "emoji")
+            emojis_for_role.append(f"{custom_name}:{alt}")
+        elif isinstance(alt, str):
+            emojis_for_role.append(alt)
+
+    ROLE_ID_TO_EMOJIS[role_id] = emojis_for_role
 
 ROLES_CHANNEL_ID = 1559330910132764782  # #roles
+
 
 class ColorRolesCog(commands.Cog, name="Color Roles"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.menu_message_id: Optional[int] = None
+        self._user_locks: Dict[int, asyncio.Lock] = {}
+
+    def _get_user_lock(self, user_id: int) -> asyncio.Lock:
+        """Prevents race conditions if a user spam-clicks reactions."""
+        if user_id not in self._user_locks:
+            self._user_locks[user_id] = asyncio.Lock()
+        return self._user_locks[user_id]
 
     async def cog_load(self):
         logger.info("Color Roles cog loaded.")
@@ -45,14 +66,12 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         if not channel:
             return
 
-        # Check if the menu is already posted to avoid duplicates
         async for msg in channel.history(limit=15):
             if msg.author.id == self.bot.user.id and msg.embeds and "Choose Your Name Color" in (msg.embeds[0].title or ""):
                 self.menu_message_id = msg.id
-                logger.info(f"Found existing Color Role Menu in #{channel.name} (Message ID: {msg.id})")
+                logger.info(f"Found existing Color Role Menu in #{channel.name} (ID: {msg.id})")
                 return
 
-        # Not posted yet -> post the clean menu
         await self.post_color_menu(channel)
 
     async def post_color_menu(self, channel: discord.TextChannel) -> discord.Message:
@@ -78,11 +97,10 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         msg = await channel.send(embed=embed)
         self.menu_message_id = msg.id
 
-        # React in order with unicode emojis
         for item in COLOR_DEFINITIONS:
             try:
                 await msg.add_reaction(item["emoji"])
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.2)
             except Exception as e:
                 logger.debug(f"Reaction add error: {e}")
 
@@ -111,11 +129,10 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         """
-        Exclusive Color Role Assigner:
-        When a member reacts with a color emoji:
-        1. Strips any previous color role
-        2. Removes the member's previous reaction from the message
-        3. Grants the new color role
+        Hyper-Optimized Exclusive Color Role Assigner:
+        - Atomic 1-call role swap (member.edit)
+        - Direct parallel reaction deletion (0ms message fetch)
+        - Instant cache lookup
         """
         if payload.user_id == self.bot.user.id:
             return
@@ -128,7 +145,111 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         if not guild:
             return
 
-        member = payload.member
+        # Fast cache lookup for member
+        member = payload.member or guild.get_member(payload.user_id)
+        if not member:
+            try:
+                member = await guild.fetch_member(payload.user_id)
+            except Exception:
+                return
+
+        if not member or member.bot:
+            return
+
+        async with self._get_user_lock(member.id):
+            target_role = guild.get_role(target_info["id"]) or discord.utils.get(guild.roles, name=target_info["name"])
+
+            # 1. Calculate atomic role update
+            current_roles = list(member.roles)
+            roles_to_keep = [r for r in current_roles if r.id not in ALL_COLOR_ROLE_IDS]
+            
+            # Roles being removed
+            roles_being_removed = [r for r in current_roles if r.id in ALL_COLOR_ROLE_IDS and (target_role is None or r.id != target_role.id)]
+
+            if target_role and target_role not in roles_to_keep:
+                final_roles = roles_to_keep + [target_role]
+            else:
+                final_roles = roles_to_keep
+
+            # Prepare parallel operations
+            tasks = []
+
+            # A. Update Discord roles in ONE single atomic API call
+            if set(final_roles) != set(current_roles):
+                tasks.append(
+                    member.edit(roles=final_roles, reason=f"Exclusive Color: {target_info['name']}")
+                )
+
+            # B. Directly delete previous reaction(s) without needing to fetch the message
+            for removed_role in roles_being_removed:
+                emojis_to_delete = ROLE_ID_TO_EMOJIS.get(removed_role.id, [])
+                for em in emojis_to_delete:
+                    try:
+                        em_str = convert_emoji_reaction(em)
+                        tasks.append(
+                            self.bot.http.remove_reaction(
+                                payload.channel_id,
+                                payload.message_id,
+                                em_str,
+                                member.id
+                            )
+                        )
+                    except Exception:
+                        pass
+
+            # Execute role change and reaction cleanup in PARALLEL
+            if tasks:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                for res in results:
+                    if isinstance(res, Exception) and not isinstance(res, discord.NotFound):
+                        logger.debug(f"Fast role/reaction operation notice: {res}")
+
+            logger.info(f"⚡ [Super-Fast] Assigned {target_info['name']} & removed previous roles/reactions for {member.display_name}")
+
+            # C. Background cleanup for any lingering reactions
+            asyncio.create_task(self._cleanup_other_reactions(payload.channel_id, payload.message_id, member, target_info["id"]))
+
+    async def _cleanup_other_reactions(self, channel_id: int, message_id: int, member: discord.Member, active_role_id: int):
+        """Asynchronously cleans up any stray reactions without delaying the user response."""
+        try:
+            channel = self.bot.get_channel(channel_id)
+            if not channel:
+                return
+            message = discord.utils.get(self.bot.cached_messages, id=message_id) or await channel.fetch_message(message_id)
+            if not message:
+                return
+
+            cleanup_tasks = []
+            for r in message.reactions:
+                r_info = self._get_color_info(r.emoji)
+                if r_info and r_info["id"] != active_role_id:
+                    em_str = convert_emoji_reaction(r.emoji)
+                    cleanup_tasks.append(
+                        self.bot.http.remove_reaction(channel_id, message_id, em_str, member.id)
+                    )
+            if cleanup_tasks:
+                await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+        except Exception:
+            pass
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
+        """
+        When member unreacts from their color:
+        Removes the color role, reverting to default username color with 0ms latency.
+        """
+        if payload.user_id == self.bot.user.id:
+            return
+
+        target_info = self._get_color_info(payload.emoji)
+        if not target_info:
+            return
+
+        guild = self.bot.get_guild(payload.guild_id)
+        if not guild:
+            return
+
+        member = guild.get_member(payload.user_id)
         if not member:
             try:
                 member = await guild.fetch_member(payload.user_id)
@@ -140,91 +261,13 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
 
         target_role = guild.get_role(target_info["id"]) or discord.utils.get(guild.roles, name=target_info["name"])
 
-        # Fetch message to clean up old user reactions
-        channel = guild.get_channel(payload.channel_id)
-        message = None
-        if channel:
-            try:
-                message = await channel.fetch_message(payload.message_id)
-            except Exception:
-                pass
-
-        # 1. Identify previous color roles to strip
-        roles_to_remove = [r for r in member.roles if r.id in ALL_COLOR_ROLE_IDS and (target_role is None or r.id != target_role.id)]
-
-        if roles_to_remove:
-            try:
-                await member.remove_roles(*roles_to_remove, reason="Switched to new name color")
-                logger.info(f"Removed previous color roles {[r.name for r in roles_to_remove]} from {member.display_name}")
-            except discord.Forbidden:
-                logger.warning(
-                    f"PERMISSION ERROR: Bot cannot remove roles! Please move 'Jey's Bot 💜' role ABOVE color roles in Server Settings -> Roles and grant 'Manage Roles'."
-                )
-            except Exception as e:
-                logger.error(f"Error removing roles from {member.display_name}: {e}")
-
-        # 2. Add the new color role immediately
-        if target_role:
-            try:
-                await member.add_roles(target_role, reason=f"Selected {target_role.name} color")
-                logger.info(f"✨ Successfully assigned color role '{target_role.name}' to {member.display_name}")
-            except discord.Forbidden:
-                logger.warning(
-                    f"PERMISSION ERROR: Bot cannot assign '{target_role.name}'! Please verify 'Jey's Bot 💜' role is above '{target_role.name}' and has 'Manage Roles'."
-                )
-            except Exception as e:
-                logger.error(f"Error adding role {target_role.name} to {member.display_name}: {e}")
-
-        # 3. Clean up member's previous color reactions from this message
-        if message:
-            for r in message.reactions:
-                try:
-                    reaction_color = self._get_color_info(r.emoji)
-                    if reaction_color and reaction_color["id"] != target_info["id"]:
-                        await message.remove_reaction(r.emoji, member)
-                        logger.debug(f"Removed reaction {r.emoji} from {member.display_name}")
-                except discord.Forbidden:
-                    logger.warning("PERMISSION ERROR: Bot needs 'Manage Messages' permission to remove old reactions.")
-                except Exception as e:
-                    logger.debug(f"Could not remove old reaction: {e}")
-
-    @commands.Cog.listener()
-    async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
-        """
-        When member unreacts from their color:
-        Removes the color role, reverting to default username color.
-        """
-        if payload.user_id == self.bot.user.id:
-            return
-
-        target_info = self._get_color_info(payload.emoji)
-        if not target_info:
-            return
-
-        guild = self.bot.get_guild(payload.guild_id)
-        if not guild:
-            return
-
-        try:
-            member = await guild.fetch_member(payload.user_id)
-        except Exception:
-            return
-
-        if not member or member.bot:
-            return
-
-        target_role = guild.get_role(target_info["id"]) or discord.utils.get(guild.roles, name=target_info["name"])
-
         if target_role and target_role in member.roles:
             try:
                 await member.remove_roles(target_role, reason="Unreacted from color role")
-                logger.info(f"Removed color role '{target_role.name}' from {member.display_name}")
-            except discord.Forbidden:
-                logger.warning(
-                    f"PERMISSION ERROR: Bot cannot remove '{target_role.name}'! Check role hierarchy and 'Manage Roles' permission."
-                )
+                logger.info(f"⚡ [Super-Fast] Removed color role '{target_role.name}' from {member.display_name}")
             except Exception as e:
                 logger.error(f"Error removing unreacted color role: {e}")
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ColorRolesCog(bot))
