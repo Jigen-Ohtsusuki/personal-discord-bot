@@ -69,10 +69,60 @@ export default {
         });
       }
 
+      const tests = {
+        LIVE: {
+          channelId: DISCORD_CHANNELS.LIVE,
+          content: "🚨 **TEST ALERT**: Jey's Bot 💜 is connected to Cloudflare!",
+          embeds: [{
+            title: "🔴 LIVE STREAM ALERT • Channel Test",
+            description: "🎉 **Jey's Bot 💜 is now live 24/7 on Cloudflare!**\nAll active livestreams and scheduled stream reminders for **MissJey**, **SIG07**, and **Directioner** will arrive right here in `#live-streams`.",
+            color: 0xFF0033,
+            footer: { text: "Jey's Bot 💜 • 24/7 Cloudflare Engine" },
+            timestamp: new Date().toISOString()
+          }],
+          components: [{
+            type: 1,
+            components: [{ type: 2, style: 5, label: "▶ Watch Live Streams", url: "https://www.youtube.com/@MissjeyGaming/streams" }]
+          }]
+        },
+        VIDEOS: {
+          channelId: DISCORD_CHANNELS.VIDEOS,
+          content: "🍿 **TEST ALERT**: Jey's Bot 💜 is connected to Cloudflare!",
+          embeds: [{
+            title: "🎬 NEW VIDEO ALERT • Channel Test",
+            description: "🎉 **Jey's Bot 💜 is now live 24/7 on Cloudflare!**\nAll standard video uploads and premieres will be routed directly to this `#videos` channel.",
+            color: 0xCC0000,
+            footer: { text: "Jey's Bot 💜 • 24/7 Cloudflare Engine" },
+            timestamp: new Date().toISOString()
+          }],
+          components: [{
+            type: 1,
+            components: [{ type: 2, style: 5, label: "▶ Browse Videos", url: "https://www.youtube.com/@MissjeyGaming/videos" }]
+          }]
+        },
+        SHORTS: {
+          channelId: DISCORD_CHANNELS.SHORTS,
+          content: "⚡ **TEST ALERT**: Jey's Bot 💜 is connected to Cloudflare!",
+          embeds: [{
+            title: "🩳 NEW SHORTS ALERT • Channel Test",
+            description: "🎉 **Jey's Bot 💜 is now live 24/7 on Cloudflare!**\nAll YouTube Shorts will be delivered immediately to this `#shorts` channel.",
+            color: 0xFF5722,
+            footer: { text: "Jey's Bot 💜 • 24/7 Cloudflare Engine" },
+            timestamp: new Date().toISOString()
+          }],
+          components: [{
+            type: 1,
+            components: [{ type: 2, style: 5, label: "📱 Open Shorts", url: "https://www.youtube.com/@MissjeyGaming/shorts" }]
+          }]
+        }
+      };
+
       const results = {};
-      for (const [type, channelId] of Object.entries(DISCORD_CHANNELS)) {
-        const res = await sendDiscordMessage(token, channelId, {
-          content: `💜 **Jey's Bot Direct Test**: Connected directly to #${type.toLowerCase()} via Discord Bot API!`
+      for (const [type, data] of Object.entries(tests)) {
+        const res = await sendDiscordMessage(token, data.channelId, {
+          content: data.content,
+          embeds: data.embeds,
+          components: data.components
         });
         results[type] = res ? "Delivered ✅" : "Failed ❌";
       }
