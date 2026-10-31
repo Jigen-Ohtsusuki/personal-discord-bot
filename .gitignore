@@ -1,0 +1,28 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Node Modules & Credentials
+node_modules/
+**/node_modules/
+fcm_credentials.json
+**/fcm_credentials.json
+
+# Environment Variables & Secrets
+.env
+
+# SQLite Database
+*.db
+*.db-journal
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# IDE & OS
+.vscode/
+.idea/
+Thumbs.db

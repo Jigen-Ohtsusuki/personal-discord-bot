@@ -1,0 +1,13 @@
+{
+  "name": "youtube-fcm-receiver",
+  "version": "1.0.0",
+  "description": "FCM Push Receiver bridge for YouTube notification bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "push-receiver": "^2.1.1",
+    "axios": "^1.7.7"
+  }
+}
