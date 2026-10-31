@@ -1,6 +1,6 @@
 /**
- * Jey's Bot 💜 - Cloudflare 24/7 YouTube Notification Worker
- * 100% Free Forever • Zero Polling • Direct Discord Bot REST API
+ * Jey's Bot 💜 - 24/7 Cloudflare YouTube Engine
+ * 100% Free Forever • Zero Polling • Lively & Production-Grade
  */
 
 // Target YouTube Creators
@@ -10,12 +10,43 @@ const CREATORS = {
   "UCO6Yn9mmANIMTVhpcOeZczQ": "Directioner"
 };
 
-// Discord Channel IDs for MissJey's Community
+// Discord Channel Routing
 const DISCORD_CHANNELS = {
   LIVE: "1566020837151211671",    // #live-streams
   VIDEOS: "1566020914787651586",  // #videos
   SHORTS: "1566021006961811586"   // #shorts
 };
+
+// Lively, rotating community shoutouts
+const LIVELY_MESSAGES = {
+  LIVE: [
+    "🔥 Wake up community! **{creator}** is **LIVE** right now! Grab your snacks and jump in 💜",
+    "🚨 Stop scrolling! **{creator}** just hit the **GO LIVE** button! Get in the chat 🔥",
+    "🎮 Game faces on! **{creator}** is streaming live right now! Come hang out and show some love 💜",
+    "💜 The stream is LIVE! **{creator}** is in the lobby! Tap the button below to join the hype 🚀"
+  ],
+  UPCOMING: [
+    "⏰ Mark your calendars! **{creator}** just scheduled a new live stream! Set your reminders 🎯",
+    "📅 Upcoming stream alert! **{creator}** planned a new stream! Check the countdown below 💜",
+    "🔔 Don't miss it! **{creator}** scheduled a live session! Drop a reminder so you are there on time 🔥"
+  ],
+  SHORTS: [
+    "⚡ Quick bite! **{creator}** just dropped a brand new Short! Tap below to watch 📱",
+    "🩳 Fresh Short alert! New clip from **{creator}** is out! Go show some love 💜",
+    "✨ New Short incoming! Check out what **{creator}** just posted 🔥"
+  ],
+  VIDEO: [
+    "🍿 New video drop! **{creator}** just uploaded a brand new video! Grab your popcorn 🎬",
+    "🎬 Fresh upload alert! A brand new video from **{creator}** is out now! Go check it out 💜",
+    "🔥 Drop everything! **{creator}** just released a new video! Tap below to watch 🍿"
+  ]
+};
+
+function getRandomMessage(type, creator) {
+  const pool = LIVELY_MESSAGES[type] || LIVELY_MESSAGES.VIDEO;
+  const template = pool[Math.floor(Math.random() * pool.length)];
+  return template.replace("{creator}", creator);
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -69,65 +100,53 @@ export default {
         });
       }
 
-      const tests = {
-        LIVE: {
-          channelId: DISCORD_CHANNELS.LIVE,
-          content: "🚨 **TEST ALERT**: Jey's Bot 💜 is connected to Cloudflare!",
-          embeds: [{
-            title: "🔴 LIVE STREAM ALERT • Channel Test",
-            description: "🎉 **Jey's Bot 💜 is now live 24/7 on Cloudflare!**\nAll active livestreams and scheduled stream reminders for **MissJey**, **SIG07**, and **Directioner** will arrive right here in `#live-streams`.",
-            color: 0xFF0033,
-            footer: { text: "Jey's Bot 💜 • 24/7 Cloudflare Engine" },
-            timestamp: new Date().toISOString()
-          }],
-          components: [{
-            type: 1,
-            components: [{ type: 2, style: 5, label: "▶ Watch Live Streams", url: "https://www.youtube.com/@MissjeyGaming/streams" }]
-          }]
-        },
-        VIDEOS: {
-          channelId: DISCORD_CHANNELS.VIDEOS,
-          content: "🍿 **TEST ALERT**: Jey's Bot 💜 is connected to Cloudflare!",
-          embeds: [{
-            title: "🎬 NEW VIDEO ALERT • Channel Test",
-            description: "🎉 **Jey's Bot 💜 is now live 24/7 on Cloudflare!**\nAll standard video uploads and premieres will be routed directly to this `#videos` channel.",
-            color: 0xCC0000,
-            footer: { text: "Jey's Bot 💜 • 24/7 Cloudflare Engine" },
-            timestamp: new Date().toISOString()
-          }],
-          components: [{
-            type: 1,
-            components: [{ type: 2, style: 5, label: "▶ Browse Videos", url: "https://www.youtube.com/@MissjeyGaming/videos" }]
-          }]
-        },
-        SHORTS: {
-          channelId: DISCORD_CHANNELS.SHORTS,
-          content: "⚡ **TEST ALERT**: Jey's Bot 💜 is connected to Cloudflare!",
-          embeds: [{
-            title: "🩳 NEW SHORTS ALERT • Channel Test",
-            description: "🎉 **Jey's Bot 💜 is now live 24/7 on Cloudflare!**\nAll YouTube Shorts will be delivered immediately to this `#shorts` channel.",
-            color: 0xFF5722,
-            footer: { text: "Jey's Bot 💜 • 24/7 Cloudflare Engine" },
-            timestamp: new Date().toISOString()
-          }],
-          components: [{
-            type: 1,
-            components: [{ type: 2, style: 5, label: "📱 Open Shorts", url: "https://www.youtube.com/@MissjeyGaming/shorts" }]
-          }]
-        }
-      };
-
       const results = {};
-      for (const [type, data] of Object.entries(tests)) {
-        const res = await sendDiscordMessage(token, data.channelId, {
-          content: data.content,
-          embeds: data.embeds,
-          components: data.components
-        });
-        results[type] = res ? "Delivered ✅" : "Failed ❌";
-      }
+      results.LIVE = (await sendDiscordMessage(token, DISCORD_CHANNELS.LIVE, {
+        content: getRandomMessage("LIVE", "MissJey"),
+        embeds: [{
+          title: "🔴 LIVE NOW • RANKED VALORANT WITH VIEWERS! 💜",
+          description: "MissJey is LIVE right now grinding Radiant lobbies! Come hang out, chat, and drop a like!",
+          color: 0xFF0033,
+          footer: { text: "Jey's Bot 💜 • 24/7 Cloudflare Engine" },
+          timestamp: new Date().toISOString()
+        }],
+        components: [{
+          type: 1,
+          components: [{ type: 2, style: 5, label: "▶ Watch Live Stream", url: "https://www.youtube.com/@MissjeyGaming/streams" }]
+        }]
+      })) ? "Delivered ✅" : "Failed ❌";
 
-      return new Response(JSON.stringify({ status: "Test complete", results }, null, 2), {
+      results.VIDEOS = (await sendDiscordMessage(token, DISCORD_CHANNELS.VIDEOS, {
+        content: getRandomMessage("VIDEO", "MissJey"),
+        embeds: [{
+          title: "🎬 NEW VIDEO • My Funniest Valorant Highlights! 😂",
+          description: "New video just dropped! Grab your snacks, watch the highlights, and leave a comment!",
+          color: 0xCC0000,
+          footer: { text: "Jey's Bot 💜 • 24/7 Cloudflare Engine" },
+          timestamp: new Date().toISOString()
+        }],
+        components: [{
+          type: 1,
+          components: [{ type: 2, style: 5, label: "▶ Watch Video", url: "https://www.youtube.com/@MissjeyGaming/videos" }]
+        }]
+      })) ? "Delivered ✅" : "Failed ❌";
+
+      results.SHORTS = (await sendDiscordMessage(token, DISCORD_CHANNELS.SHORTS, {
+        content: getRandomMessage("SHORTS", "MissJey"),
+        embeds: [{
+          title: "🩳 NEW SHORT • 🏅 #valorant #gamergirl #viral",
+          description: "Quick Short just dropped! Tap below to open on mobile or web:",
+          color: 0xFF5722,
+          footer: { text: "Jey's Bot 💜 • 24/7 Cloudflare Engine" },
+          timestamp: new Date().toISOString()
+        }],
+        components: [{
+          type: 1,
+          components: [{ type: 2, style: 5, label: "📱 Open Short", url: "https://www.youtube.com/@MissjeyGaming/shorts" }]
+        }]
+      })) ? "Delivered ✅" : "Failed ❌";
+
+      return new Response(JSON.stringify({ status: "Lively test complete", results }, null, 2), {
         status: 200,
         headers: { "Content-Type": "application/json" }
       });
@@ -144,10 +163,10 @@ export default {
       if (videoIdMatch && channelIdMatch) {
         const videoId = videoIdMatch[1].trim();
         const channelId = channelIdMatch[1].trim();
-        const title = titleMatch && titleMatch[1] ? titleMatch[1].replace(/<\/?title>/g, "").trim() : "New Content";
+        const title = titleMatch && titleMatch[1] ? titleMatch[1].replace(/<\/?title>/g, "").trim() : "New YouTube Content";
         const creator = CREATORS[channelId] || "Creator";
 
-        // Dispatch in background
+        // Dispatch asynchronously in background (zero delay to Google)
         ctx.waitUntil(handleYouTubeEvent(videoId, channelId, title, creator, env));
       }
 
@@ -156,7 +175,7 @@ export default {
     }
 
     return new Response(
-      "💜 Jey's Bot Cloudflare 24/7 Engine is LIVE!\nVisit /subscribe to register channels with Google WebSub.\nVisit /test-discord to test direct Discord bot delivery.",
+      "💜 Jey's Bot Cloudflare 24/7 Engine is LIVE!\nVisit /subscribe to register channels with Google WebSub.\nVisit /test-discord to test direct Discord delivery.",
       { status: 200, headers: { "Content-Type": "text/plain" } }
     );
   }
@@ -165,20 +184,11 @@ export default {
 async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
   const token = env.DISCORD_TOKEN;
   if (!token) {
-    console.error("DISCORD_TOKEN is not set in Cloudflare environment!");
+    console.error("DISCORD_TOKEN is missing in Cloudflare environment!");
     return;
   }
 
-  // Deduplication via Cloudflare Cache API (Zero DB needed)
-  const cacheKey = `https://cache.jeysbot.local/posted/${videoId}`;
-  const cache = caches.default;
-  const existing = await cache.match(cacheKey);
-  if (existing) {
-    console.log(`Video ${videoId} already posted. Skipping duplicate.`);
-    return;
-  }
-
-  // 1. Classify Content (Shorts vs Video vs Live)
+  // 1. Classify Content (Shorts vs Live vs Video)
   let videoType = "VIDEO";
   let targetChannelId = DISCORD_CHANNELS.VIDEOS;
   let embedColor = 0xCC0000;
@@ -186,14 +196,15 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
   let buttonLabel = "▶ Watch Video";
   let videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   let scheduledTimeField = null;
+  let videoDescription = "";
 
-  // Check if it's a Short (200 on /shorts/ID, 303 redirect for videos)
+  // Check if it's a Short (HTTP 200 on /shorts/ID vs 303 redirect to /watch)
   try {
     const shortsRes = await fetch(`https://www.youtube.com/shorts/${videoId}`, { redirect: "manual" });
     if (shortsRes.status === 200) {
       videoType = "SHORTS";
       targetChannelId = DISCORD_CHANNELS.SHORTS;
-      embedColor = 0xFF5722;
+      embedColor = 0xFF5722; // Neon Amber-Orange
       badge = "🩳 NEW SHORT";
       buttonLabel = "📱 Open Short";
       videoUrl = `https://www.youtube.com/shorts/${videoId}`;
@@ -216,21 +227,27 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
         const liveDetails = pData?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails;
         const isLiveNow = liveDetails?.isLiveNow;
         const isLiveContent = pData?.videoDetails?.isLiveContent;
+        const shortDesc = pData?.videoDetails?.shortDescription;
+
+        if (shortDesc) {
+          // Clean first 200 characters of creator's real description
+          videoDescription = shortDesc.split("\n").filter(l => l.trim().length > 0).slice(0, 2).join("\n").slice(0, 200);
+        }
 
         if (isLiveNow) {
           videoType = "LIVE";
           targetChannelId = DISCORD_CHANNELS.LIVE;
-          embedColor = 0xFF0033;
+          embedColor = 0xFF0033; // Vibrant Live Red
           badge = "🔴 LIVE NOW";
           buttonLabel = "▶ Watch Live Stream";
         } else if (isLiveContent && !liveDetails?.endTimestamp) {
           videoType = "UPCOMING";
           targetChannelId = DISCORD_CHANNELS.LIVE;
-          embedColor = 0xF1C40F;
+          embedColor = 0xF1C40F; // Warm Gold
           badge = "📅 SCHEDULED STREAM";
           buttonLabel = "⏰ Set Reminder / View";
 
-          // Extract real scheduled start time from YouTube
+          // Extract real scheduled start time for dynamic countdown
           const rawTime = liveDetails?.startTimestamp || liveDetails?.scheduledStartTime;
           if (rawTime) {
             const unixSec = Math.floor(new Date(rawTime).getTime() / 1000);
@@ -245,14 +262,29 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
     } catch (e) {}
   }
 
-  // 2. Format Rich Discord Embed with Interactive Button
+  // 2. Strict Deduplication per (videoId, videoType) using Cloudflare Cache
+  const cacheKey = `https://cache.jeysbot.local/posted/${videoId}_${videoType}`;
+  const cache = caches.default;
+  const existing = await cache.match(cacheKey);
+  if (existing) {
+    console.log(`Video ${videoId} [${videoType}] already posted. Skipping duplicate.`);
+    return;
+  }
+
+  // 3. Format Lively Discord Embed
+  const fields = [];
+  if (scheduledTimeField) {
+    fields.push(scheduledTimeField);
+  }
+
   const embed = {
     title: `${badge} • ${rawTitle}`,
     url: videoUrl,
+    description: videoDescription || undefined,
     color: embedColor,
-    fields: scheduledTimeField ? [scheduledTimeField] : [],
+    fields: fields.length > 0 ? fields : undefined,
     author: {
-      name: creator,
+      name: `${creator} 💜`,
       url: `https://www.youtube.com/channel/${channelId}`,
       icon_url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
     },
@@ -281,7 +313,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
   ];
 
   const payload = {
-    content: `🚨 **${creator}** just posted a new **${videoType}**! Check it out below:\n${videoUrl}`,
+    content: `${getRandomMessage(videoType, creator)}\n${videoUrl}`,
     embeds: [embed],
     components: components
   };
@@ -293,7 +325,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
       headers: { "Cache-Control": "max-age=604800" }
     });
     await cache.put(cacheKey, cacheResponse);
-    console.log(`Successfully posted ${videoId} (${videoType}) to Discord channel ${targetChannelId}!`);
+    console.log(`✅ Posted ${videoId} [${videoType}] to Discord channel ${targetChannelId}!`);
   }
 }
 
