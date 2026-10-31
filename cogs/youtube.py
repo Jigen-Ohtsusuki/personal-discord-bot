@@ -19,6 +19,7 @@ class YouTubeCog(commands.Cog, name="YouTube Notifications"):
         self.bot = bot
         self.websub = WebSubManager(callback_handler=self.handle_incoming_push)
         self.websub_renewal_loop.start()
+        self.safety_sync_loop.start()
 
     async def cog_load(self):
         """Starts the WebSub webhook server when cog loads."""
@@ -26,6 +27,7 @@ class YouTubeCog(commands.Cog, name="YouTube Notifications"):
 
     def cog_unload(self):
         self.websub_renewal_loop.cancel()
+        self.safety_sync_loop.cancel()
         asyncio.create_task(self.websub.stop())
 
     def get_target_channel_for_type(
@@ -153,6 +155,55 @@ class YouTubeCog(commands.Cog, name="YouTube Notifications"):
 
     @websub_renewal_loop.before_loop
     async def before_renewal_loop(self):
+        await self.bot.wait_until_ready()
+
+    async def _fetch_rss_feed_ids(self, channel_id: str) -> list:
+        url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+        video_ids = []
+        try:
+            import aiohttp
+            import xml.etree.ElementTree as ET
+            timeout = aiohttp.ClientTimeout(total=6)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}) as resp:
+                    if resp.status == 200:
+                        text = await resp.text()
+                        root = ET.fromstring(text)
+                        ns = {'atom': 'http://www.w3.org/2005/Atom', 'yt': 'http://www.youtube.com/xml/schemas/2015'}
+                        for entry in root.findall('atom:entry', ns)[:3]:
+                            vid_elem = entry.find('yt:videoId', ns)
+                            if vid_elem is not None and vid_elem.text:
+                                video_ids.append(vid_elem.text)
+        except Exception:
+            pass
+        return video_ids
+
+    # --- Lightweight Safety Sync Task (Every 60s) ---
+    @tasks.loop(seconds=60)
+    async def safety_sync_loop(self):
+        """
+        Safety Sync: Guarantees that if Google WebSub or an external webhook
+        ever delays or drops a push, new videos and shorts are automatically detected
+        and dispatched to Discord within 60 seconds.
+        """
+        try:
+            channel_ids = await db.get_all_tracked_channel_ids()
+            for channel_id in channel_ids:
+                feed_items = await self._fetch_rss_feed_ids(channel_id)
+                for video_id in feed_items:
+                    already_posted = False
+                    for vt in ["video", "shorts", "live", "upcoming", "live_vod"]:
+                        if await db.is_video_posted(video_id, config.GUILD_ID, vt):
+                            already_posted = True
+                            break
+                    if not already_posted:
+                        logger.info(f"⚡ [Safety Sync] Catching unposted content: {video_id} on {channel_id}")
+                        await self.handle_incoming_push(video_id, channel_id)
+        except Exception as e:
+            logger.debug(f"Safety sync loop notice: {e}")
+
+    @safety_sync_loop.before_loop
+    async def before_safety_sync_loop(self):
         await self.bot.wait_until_ready()
 
     async def handle_incoming_push(self, video_id: str, channel_id: str):
