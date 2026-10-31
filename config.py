@@ -26,3 +26,6 @@ NOTIFICATION_CHANNEL_NAME = os.getenv("NOTIFICATION_CHANNEL_NAME", "").strip()
 CALLBACK_URL = os.getenv("CALLBACK_URL", "").strip().rstrip("/")
 WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "").strip()
+
+# YouTube Account Session (For secondary Bell Notification Stream)
+YOUTUBE_COOKIE = os.getenv("YOUTUBE_COOKIE", "").strip()
