@@ -451,11 +451,33 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
     components: components
   };
 
+  // If LIVE is firing and we have a stored UPCOMING message, edit that message instead of posting a new one
+  if (videoType === "LIVE" && env.JEYSBOT_CACHE) {
+    const upcomingMsgId = await env.JEYSBOT_CACHE.get(`upcoming_msgid_${videoId}`);
+    if (upcomingMsgId) {
+      const edited = await editDiscordMessage(token, DISCORD_CHANNELS.LIVE, upcomingMsgId, payload);
+      if (edited) {
+        await env.JEYSBOT_CACHE.put(kvKey, "1", { expirationTtl: 604800 });
+        console.log(`✅ Edited UPCOMING → LIVE for ${videoId} (msg ${upcomingMsgId})`);
+        return;
+      }
+      // If edit fails (message deleted etc.), fall through to send a new message
+    }
+  }
+
   const success = await sendDiscordMessage(token, targetChannelId, payload);
   if (success) {
     // Write to KV so every edge PoP knows this was already posted (7 day TTL)
     if (env.JEYSBOT_CACHE) {
       await env.JEYSBOT_CACHE.put(kvKey, "1", { expirationTtl: 604800 });
+      // If this was an UPCOMING post, store the message ID so LIVE can edit it later
+      if (videoType === "UPCOMING") {
+        const msgId = await getLastMessageId(token, targetChannelId);
+        if (msgId) {
+          await env.JEYSBOT_CACHE.put(`upcoming_msgid_${videoId}`, msgId, { expirationTtl: 604800 });
+          console.log(`📌 Stored UPCOMING message ID ${msgId} for video ${videoId}`);
+        }
+      }
     }
     console.log(`✅ Posted ${videoId} [${videoType}] to Discord channel ${targetChannelId}!`);
   }
@@ -475,5 +497,39 @@ async function sendDiscordMessage(token, channelId, payload) {
   } catch (e) {
     console.error(`Error sending message to Discord channel ${channelId}:`, e);
     return false;
+  }
+}
+
+async function editDiscordMessage(token, channelId, messageId, payload) {
+  try {
+    const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
+      method: "PATCH",
+      headers: {
+        "Authorization": `Bot ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.warn(`Failed to edit message ${messageId}: ${res.status} ${err}`);
+    }
+    return res.ok;
+  } catch (e) {
+    console.error(`Error editing message ${messageId}:`, e);
+    return false;
+  }
+}
+
+async function getLastMessageId(token, channelId) {
+  try {
+    const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages?limit=1`, {
+      headers: { "Authorization": `Bot ${token}` }
+    });
+    if (!res.ok) return null;
+    const msgs = await res.json();
+    return msgs?.[0]?.id || null;
+  } catch (e) {
+    return null;
   }
 }
