@@ -213,38 +213,33 @@ async function checkLiveStreams(env) {
       }
 
       const text = await res.text();
-      const isLive = text.includes('{"text":" LIVE"}') || text.includes('"isLive":true') || text.includes('"isLiveNow":true');
+      
+      // Strict check: Must have canonical watch URL OR redirect URL to watch?v=
+      let videoId = null;
+      const canonicalMatch = text.match(/rel="canonical"\s+href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"/i)
+        || text.match(/href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"\s+rel="canonical"/i);
 
-      if (isLive) {
-        let videoId = null;
-        const canonicalMatch = text.match(/rel="canonical"\s+href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"/i)
-          || text.match(/href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"\s+rel="canonical"/i)
-          || text.match(/"liveStreamability".*?"videoId":"([a-zA-Z0-9_-]{11})"/s)
-          || text.match(/"watchEndpoint":{"videoId":"([a-zA-Z0-9_-]{11})"/);
+      if (canonicalMatch) {
+        videoId = canonicalMatch[1];
+      } else if (res.url && res.url.includes("watch?v=")) {
+        videoId = res.url.split("watch?v=")[1].split("&")[0];
+      }
 
-        if (canonicalMatch) {
-          videoId = canonicalMatch[1];
-        } else if (res.url && res.url.includes("watch?v=")) {
-          videoId = res.url.split("watch?v=")[1].split("&")[0];
-        } else {
-          const anyVid = text.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
-          if (anyVid) videoId = anyVid[1];
+      // Must be actively broadcasting live right now
+      const isLiveNow = videoId && (text.includes('"isLiveNow":true') || text.includes('"status":"LIVE"') || text.includes('"liveBroadcastDetails":{"isLiveNow":true'));
+
+      if (isLiveNow && videoId) {
+        let title = `${creator} is LIVE rn!`;
+        const titleMatch = text.match(/<title>(.*?)<\/title>/);
+        if (titleMatch && titleMatch[1]) {
+          title = titleMatch[1].replace(" - YouTube", "").trim();
         }
-
-        if (videoId) {
-          let title = `${creator} is LIVE right now!`;
-          const titleMatch = text.match(/<title>(.*?)<\/title>/);
-          if (titleMatch && titleMatch[1]) {
-            title = titleMatch[1].replace(" - YouTube", "").trim();
-          }
-          if (token) {
-            await handleYouTubeEvent(videoId, channelId, title, creator, env);
-            results[creator] = `LIVE (${videoId}): Dispatched ✅`;
-          } else {
-            results[creator] = `LIVE (${videoId}): Detected, but DISCORD_TOKEN is missing in Cloudflare Secrets!`;
-          }
+        if (token) {
+          // Pass onlyLive=true so it ONLY posts if confirmed to be an active live stream
+          await handleYouTubeEvent(videoId, channelId, title, creator, env, true);
+          results[creator] = `LIVE (${videoId}): Dispatched ✅`;
         } else {
-          results[creator] = "LIVE detected but Video ID not resolved";
+          results[creator] = `LIVE (${videoId}): Detected, but token missing`;
         }
       } else {
         results[creator] = "Offline";
@@ -257,7 +252,7 @@ async function checkLiveStreams(env) {
   return results;
 }
 
-async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
+async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, onlyLive = false) {
   const token = env.DISCORD_TOKEN || env.BOT_TOKEN || env.DISCORD_BOT_TOKEN || env.TOKEN;
   if (!token) {
     console.error("DISCORD_TOKEN is missing in Cloudflare environment!");
@@ -287,7 +282,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
     }
   } catch (e) {}
 
-  // Check if it's a Live Stream via InnerTube
+  // Check details via InnerTube
   if (videoType !== "SHORTS") {
     try {
       const playerRes = await fetch("https://www.youtube.com/youtubei/v1/player", {
@@ -300,6 +295,14 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
       });
       if (playerRes.ok) {
         const pData = await playerRes.json();
+        
+        // Strict channel verification: The video MUST belong to the tracked creator!
+        const actualChannelId = pData?.videoDetails?.channelId;
+        if (actualChannelId && actualChannelId !== channelId) {
+          console.warn(`Video ${videoId} belongs to ${actualChannelId}, not ${channelId}. Skipping.`);
+          return;
+        }
+
         const liveDetails = pData?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails;
         const isLiveNow = liveDetails?.isLiveNow;
         const isLiveContent = pData?.videoDetails?.isLiveContent;
@@ -322,7 +325,6 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
           badge = "📅 SCHEDULED STREAM";
           buttonLabel = "Set Reminder";
 
-          // Extract real scheduled start time for dynamic countdown
           const rawTime = liveDetails?.startTimestamp || liveDetails?.scheduledStartTime;
           if (rawTime) {
             const unixSec = Math.floor(new Date(rawTime).getTime() / 1000);
@@ -335,6 +337,12 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
         }
       }
     } catch (e) {}
+  }
+
+  // If called from live-stream prober, NEVER post if not actively live!
+  if (onlyLive && videoType !== "LIVE") {
+    console.log(`Video ${videoId} is not an active live stream (type: ${videoType}). Skipping.`);
+    return;
   }
 
   // 2. Strict Deduplication per (videoId, videoType) using Cloudflare Cache
