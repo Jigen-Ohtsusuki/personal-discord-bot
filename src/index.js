@@ -324,6 +324,11 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
           embedColor = 0xFF0033;
           badge = "🔴 LIVE";
           buttonLabel = "Watch Stream";
+        } else if (isLiveContent && liveDetails?.endTimestamp) {
+          // Stream has already ended — YouTube WebSub re-pushes it as a "video" after the stream.
+          // We NEVER want to post a finished stream to #videos or anywhere else.
+          console.log(`Video ${videoId} is a completed live stream (ended: ${liveDetails.endTimestamp}). Dropping.`);
+          return;
         } else if (isLiveContent && !liveDetails?.endTimestamp) {
           videoType = "UPCOMING";
           targetChannelId = DISCORD_CHANNELS.LIVE;
@@ -351,14 +356,33 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
     return;
   }
 
-  // 2. Strict Deduplication per (videoId, videoType) using Cloudflare KV
-  // KV persists globally across all edge PoPs, unlike caches.default which is per-PoP
+  // 2. Strict Deduplication using Cloudflare KV
+  // Use a shared base key per videoId so LIVE/UPCOMING/VIDEO don't all post for the same stream.
+  // Rule: once ANY type has been posted for a videoId, block all further types for that video.
   const kvKey = `posted_${videoId}_${videoType}`;
+  const kvBaseKey = `posted_${videoId}`; // shared across all types for this video
   if (env.JEYSBOT_CACHE) {
+    // Block if this exact type was already posted
     const existing = await env.JEYSBOT_CACHE.get(kvKey);
     if (existing) {
       console.log(`Video ${videoId} [${videoType}] already posted (KV). Skipping duplicate.`);
       return;
+    }
+    // Block UPCOMING if LIVE was already posted for this videoId (stream went live before scheduled post)
+    if (videoType === "UPCOMING") {
+      const liveAlreadyPosted = await env.JEYSBOT_CACHE.get(`posted_${videoId}_LIVE`);
+      if (liveAlreadyPosted) {
+        console.log(`Video ${videoId}: LIVE already posted, skipping UPCOMING duplicate.`);
+        return;
+      }
+    }
+    // Block VIDEO if LIVE was already posted (stream VOD showing up in WebSub after ending)
+    if (videoType === "VIDEO") {
+      const liveAlreadyPosted = await env.JEYSBOT_CACHE.get(`posted_${videoId}_LIVE`);
+      if (liveAlreadyPosted) {
+        console.log(`Video ${videoId}: LIVE already posted, skipping VIDEO (stream VOD). Dropping.`);
+        return;
+      }
     }
   } else {
     console.warn("JEYSBOT_CACHE KV namespace not bound — deduplication skipped! Bind it in Cloudflare dashboard.");
