@@ -10,4 +10,4 @@ crons = ["* * * * *"]
 # Replace <NAMESPACE_ID> with the real ID from Cloudflare Dashboard → Workers & Pages → KV
 [[kv_namespaces]]
 binding = "JEYSBOT_CACHE"
-id = "<NAMESPACE_ID>"
+id = "bdde5185f348484bafc382afb4f5d38e"
