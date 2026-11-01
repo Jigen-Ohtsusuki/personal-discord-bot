@@ -115,6 +115,7 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
                     self.menu_message_id = msg.id
                     found = True
                     logger.info(f"Game Role Menu active in '{guild.name}' #{channel.name} (ID: {msg.id})")
+                    await self.sync_offline_game_reactions(guild, msg)
                     break
 
             if not found and channel.permissions_for(guild.me).send_messages:
@@ -122,6 +123,42 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
                     await self.post_game_menu(channel)
                 except Exception as e:
                     logger.error(f"Error posting game menu: {e}")
+
+    async def sync_offline_game_reactions(self, guild: discord.Guild, message: discord.Message):
+        """Scans reactions on the game roles menu and gives missing roles to members who reacted while bot was offline."""
+        logger.info(f"🔄 Syncing offline game reactions in '{guild.name}'...")
+        try:
+            fresh_msg = await message.channel.fetch_message(message.id)
+            for reaction in fresh_msg.reactions:
+                emoji_str = str(reaction.emoji)
+                game_info = GAME_EMOJI_LOOKUP.get(emoji_str)
+                if not game_info:
+                    continue
+
+                target_role = await self._resolve_game_role(guild, game_info)
+                if not target_role:
+                    continue
+
+                async for user in reaction.users():
+                    if user.id == self.bot.user.id or user.bot:
+                        continue
+                    member = guild.get_member(user.id)
+                    if not member:
+                        try:
+                            member = await guild.fetch_member(user.id)
+                        except Exception:
+                            continue
+                    if not member or member.bot:
+                        continue
+
+                    if target_role not in member.roles:
+                        try:
+                            await member.add_roles(target_role, reason=f"Offline Sync: {game_info['name']}")
+                            logger.info(f"🎮 [Offline Sync] Assigned game role '{target_role.name}' to {member.display_name}")
+                        except Exception as e:
+                            logger.error(f"Error syncing game role {target_role.name} for {member.display_name}: {e}")
+        except Exception as e:
+            logger.error(f"Error during offline game reaction sync: {e}")
 
     async def post_game_menu(self, channel: discord.TextChannel) -> discord.Message:
         """Posts the clean game roles menu with all emoji reactions."""

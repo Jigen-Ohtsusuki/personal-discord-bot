@@ -181,10 +181,76 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
                             await found_msg.add_reaction(c["emoji"])
                             await asyncio.sleep(0.3)
                     logger.info(f"✨ Successfully updated color menu and reactions in '{guild.name}'")
+                    await self.sync_offline_reactions(guild, found_msg)
                 except Exception as e:
                     logger.error(f"Error updating existing color menu: {e}")
             elif channel.permissions_for(guild.me).send_messages:
                 await self.post_color_menu(channel)
+
+    async def sync_offline_reactions(self, guild: discord.Guild, message: discord.Message):
+        """Reads all reactions on the color menu and assigns missing roles to members who reacted while bot was offline."""
+        logger.info(f"🔄 Syncing offline color reactions in '{guild.name}'...")
+        try:
+            fresh_msg = await message.channel.fetch_message(message.id)
+            user_target_colors: Dict[int, Dict[str, Any]] = {}
+            user_all_emojis: Dict[int, list] = {}
+
+            for reaction in fresh_msg.reactions:
+                emoji_str = str(reaction.emoji)
+                target_info = COLOR_LOOKUP.get(emoji_str)
+                if not target_info:
+                    continue
+
+                async for user in reaction.users():
+                    if user.id == self.bot.user.id or user.bot:
+                        continue
+                    user_target_colors[user.id] = target_info
+                    user_all_emojis.setdefault(user.id, []).append(emoji_str)
+
+            for user_id, target_info in user_target_colors.items():
+                member = guild.get_member(user_id)
+                if not member:
+                    try:
+                        member = await guild.fetch_member(user_id)
+                    except Exception:
+                        continue
+                if not member or member.bot:
+                    continue
+
+                target_role = await self._resolve_target_role(guild, target_info)
+                current_roles = list(member.roles)
+
+                roles_being_removed = [
+                    r for r in current_roles
+                    if r.name.lower() in COLOR_NAMES and (target_role is None or r.id != target_role.id)
+                ]
+
+                # Clean up excess emoji reactions if user reacted to multiple
+                emojis_user_has = user_all_emojis.get(user_id, [])
+                if len(emojis_user_has) > 1:
+                    for old_emoji in emojis_user_has:
+                        if old_emoji != target_info["emoji"]:
+                            try:
+                                await self.bot.http.remove_reaction(
+                                    message.channel.id,
+                                    message.id,
+                                    convert_emoji_reaction(old_emoji),
+                                    user_id
+                                )
+                            except Exception:
+                                pass
+
+                roles_to_keep = [r for r in current_roles if r not in roles_being_removed]
+                final_roles = roles_to_keep + ([target_role] if target_role and target_role not in roles_to_keep else [])
+
+                if set(final_roles) != set(current_roles):
+                    try:
+                        await member.edit(roles=final_roles, reason=f"Offline Sync: {target_info['name']}")
+                        logger.info(f"🎨 [Offline Sync] Set color '{target_info['name']}' for {member.display_name}")
+                    except Exception as e:
+                        logger.error(f"Error syncing color role for {member.display_name}: {e}")
+        except Exception as e:
+            logger.error(f"Error during offline reaction sync: {e}")
 
     async def post_color_menu(self, channel: discord.TextChannel) -> discord.Message:
         """Posts clean color picker embed in the target channel."""
