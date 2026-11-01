@@ -196,10 +196,10 @@ export default {
 };
 
 async function checkLiveStreams(env) {
-  const token = env.DISCORD_TOKEN;
+  const token = env.DISCORD_TOKEN || env.BOT_TOKEN || env.DISCORD_BOT_TOKEN || env.TOKEN;
   if (!token) {
-    console.error("DISCORD_TOKEN is missing in Cloudflare environment!");
-    return { error: "DISCORD_TOKEN missing" };
+    console.error("DISCORD_TOKEN is missing in Cloudflare environment! Available env keys:", Object.keys(env));
+    return { error: "DISCORD_TOKEN missing", availableEnvKeys: Object.keys(env) };
   }
 
   const results = {};
@@ -253,7 +253,7 @@ async function checkLiveStreams(env) {
 }
 
 async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
-  const token = env.DISCORD_TOKEN;
+  const token = env.DISCORD_TOKEN || env.BOT_TOKEN || env.DISCORD_BOT_TOKEN || env.TOKEN;
   if (!token) {
     console.error("DISCORD_TOKEN is missing in Cloudflare environment!");
     return;
