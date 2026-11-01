@@ -197,11 +197,6 @@ export default {
 
 async function checkLiveStreams(env) {
   const token = env.DISCORD_TOKEN || env.BOT_TOKEN || env.DISCORD_BOT_TOKEN || env.TOKEN;
-  if (!token) {
-    console.error("DISCORD_TOKEN is missing in Cloudflare environment! Available env keys:", Object.keys(env));
-    return { error: "DISCORD_TOKEN missing", availableEnvKeys: Object.keys(env) };
-  }
-
   const results = {};
   for (const [channelId, creator] of Object.entries(CREATORS)) {
     try {
@@ -236,8 +231,12 @@ async function checkLiveStreams(env) {
           if (titleMatch && titleMatch[1]) {
             title = titleMatch[1].replace(" - YouTube", "").trim();
           }
-          await handleYouTubeEvent(videoId, channelId, title, creator, env);
-          results[creator] = `LIVE (${videoId}): Dispatched`;
+          if (token) {
+            await handleYouTubeEvent(videoId, channelId, title, creator, env);
+            results[creator] = `LIVE (${videoId}): Dispatched ✅`;
+          } else {
+            results[creator] = `LIVE (${videoId}): Detected, but DISCORD_TOKEN is missing in Cloudflare Secrets!`;
+          }
         } else {
           results[creator] = "LIVE detected but Video ID not resolved";
         }
