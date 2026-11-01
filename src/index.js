@@ -25,6 +25,12 @@ const LIVELY_MESSAGES = {
     "stream is live! come hang out with **{creator}** 💜",
     "we live! come say hi in chat 🔥"
   ],
+  STREAM_ENDED: [
+    "stream's over! if you missed it, the vod is up 👇",
+    "**{creator}**'s stream just ended! catch the replay below 💜",
+    "missed the stream? no worries, vod is right here 🎬",
+    "stream ended! you can still watch the full vod 👇"
+  ],
   UPCOMING: [
     "**{creator}** scheduled a stream! set your reminders ⏰",
     "new stream scheduled by **{creator}**! check the time below 💜"
@@ -325,10 +331,12 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
           badge = "🔴 LIVE";
           buttonLabel = "Watch Stream";
         } else if (isLiveContent && liveDetails?.endTimestamp) {
-          // Stream has already ended — YouTube WebSub re-pushes it as a "video" after the stream.
-          // We NEVER want to post a finished stream to #videos or anywhere else.
-          console.log(`Video ${videoId} is a completed live stream (ended: ${liveDetails.endTimestamp}). Dropping.`);
-          return;
+          // Stream has ended — post a "VOD is up" card to #live-streams instead of dropping
+          videoType = "STREAM_ENDED";
+          targetChannelId = DISCORD_CHANNELS.LIVE;
+          embedColor = 0x7289DA;
+          badge = "📼 STREAM ENDED";
+          buttonLabel = "Watch VOD";
         } else if (isLiveContent && !liveDetails?.endTimestamp) {
           videoType = "UPCOMING";
           targetChannelId = DISCORD_CHANNELS.LIVE;
@@ -381,6 +389,14 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
       const liveAlreadyPosted = await env.JEYSBOT_CACHE.get(`posted_${videoId}_LIVE`);
       if (liveAlreadyPosted) {
         console.log(`Video ${videoId}: LIVE already posted, skipping VIDEO (stream VOD). Dropping.`);
+        return;
+      }
+    }
+    // Only post STREAM_ENDED if we actually posted LIVE for this video (otherwise it's an orphan)
+    if (videoType === "STREAM_ENDED") {
+      const liveAlreadyPosted = await env.JEYSBOT_CACHE.get(`posted_${videoId}_LIVE`);
+      if (!liveAlreadyPosted) {
+        console.log(`Video ${videoId}: No LIVE post found, skipping orphan STREAM_ENDED.`);
         return;
       }
     }
