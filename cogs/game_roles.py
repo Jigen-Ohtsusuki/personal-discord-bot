@@ -7,13 +7,13 @@ from discord.ext import commands
 logger = logging.getLogger("GameRoles")
 
 GAME_DEFINITIONS = [
-    {"name": "Minecraft", "id": 1559352088364978226, "emoji": "⛏️", "hex": "#11806a", "desc": "Sandbox & Survival"},
-    {"name": "GTA", "id": 1559352200696823908, "emoji": "🚗", "hex": "#e67e22", "desc": "Grand Theft Auto & RP"},
-    {"name": "fortnite", "id": 1559352276324192356, "emoji": "🪂", "hex": "#3498db", "desc": "Battle Royale & Creative"},
-    {"name": "Roblox", "id": 1559352394624536626, "emoji": "🤖", "hex": "#607d8b", "desc": "Roblox Games & Minigames"},
-    {"name": "Among Us", "id": 1559352458420162650, "emoji": "🚀", "hex": "#e91e63", "desc": "Crewmates & Impostors"},
-    {"name": "Skribbl", "id": 1559352495417851974, "emoji": "✏️", "hex": "#f1c40f", "desc": "Drawing & Guessing"},
-    {"name": "GeoGuessr", "id": 1559352540502691910, "emoji": "🌍", "hex": "#206694", "desc": "World Exploration & Geography"},
+    {"name": "Minecraft", "id": 1559352088364978226, "emoji": "⛏️", "desc": "Sandbox & Survival"},
+    {"name": "GTA", "id": 1559352200696823908, "emoji": "🚗", "desc": "Grand Theft Auto & RP"},
+    {"name": "fortnite", "id": 1559352276324192356, "emoji": "🪂", "desc": "Battle Royale & Creative"},
+    {"name": "Roblox", "id": 1559352394624536626, "emoji": "🤖", "desc": "Roblox Games & Minigames"},
+    {"name": "Among Us", "id": 1559352458420162650, "emoji": "🚀", "desc": "Crewmates & Impostors"},
+    {"name": "Skribbl", "id": 1559352495417851974, "emoji": "✏️", "desc": "Drawing & Guessing"},
+    {"name": "GeoGuessr", "id": 1559352540502691910, "emoji": "🌍", "desc": "World Exploration & Geography"},
 ]
 
 GAME_EMOJI_LOOKUP: Dict[str, Dict[str, Any]] = {g["emoji"]: g for g in GAME_DEFINITIONS}
@@ -59,14 +59,13 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
             name_lower = g["name"].lower()
             if name_lower not in existing_names:
                 try:
-                    hex_int = int(g["hex"].lstrip("#"), 16)
                     new_role = await guild.create_role(
                         name=g["name"],
-                        color=discord.Color(hex_int),
+                        color=discord.Color.default(),
                         mentionable=True,
-                        reason="Auto-created by Jey's Bot 💜 for game matchmaking"
+                        reason="Auto-created by Jey's Bot 💜 for game matchmaking (colorless)"
                     )
-                    logger.info(f"🎮 Auto-created game role '{new_role.name}' ({g['hex']}) in '{guild.name}'")
+                    logger.info(f"🎮 Auto-created game role '{new_role.name}' (colorless) in '{guild.name}'")
                 except Exception as e:
                     logger.error(f"Failed to auto-create game role '{g['name']}': {e}")
 
@@ -80,14 +79,13 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
 
         if not role and guild.me.guild_permissions.manage_roles:
             try:
-                hex_int = int(game_info["hex"].lstrip("#"), 16)
                 role = await guild.create_role(
                     name=game_info["name"],
-                    color=discord.Color(hex_int),
+                    color=discord.Color.default(),
                     mentionable=True,
-                    reason="Auto-created by Jey's Bot 💜 on reaction"
+                    reason="Auto-created by Jey's Bot 💜 on reaction (colorless)"
                 )
-                logger.info(f"🎮 Auto-created game role '{role.name}' in '{guild.name}'")
+                logger.info(f"🎮 Auto-created game role '{role.name}' (colorless) in '{guild.name}'")
             except Exception as e:
                 logger.error(f"Error creating game role on the fly: {e}")
         return role
