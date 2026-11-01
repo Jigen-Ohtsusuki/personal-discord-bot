@@ -337,21 +337,28 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
           embedColor = 0x7289DA;
           badge = "📼 STREAM ENDED";
           buttonLabel = "Watch VOD";
-        } else if (isLiveContent && !liveDetails?.endTimestamp) {
-          videoType = "UPCOMING";
-          targetChannelId = DISCORD_CHANNELS.LIVE;
-          embedColor = 0xF1C40F;
-          badge = "📅 SCHEDULED STREAM";
-          buttonLabel = "Set Reminder";
-
+        } else if (isLiveContent) {
+          // isLiveContent=true but isLiveNow not confirmed yet (timing gap between schedule→live).
+          // Could be UPCOMING or about to go live — either way NEVER send to #videos.
+          // Treat as UPCOMING if we have a start time, otherwise drop silently and let the
+          // cron prober catch it as LIVE in the next cycle.
           const rawTime = liveDetails?.startTimestamp || liveDetails?.scheduledStartTime;
           if (rawTime) {
+            videoType = "UPCOMING";
+            targetChannelId = DISCORD_CHANNELS.LIVE;
+            embedColor = 0xF1C40F;
+            badge = "📅 SCHEDULED STREAM";
+            buttonLabel = "Set Reminder";
             const unixSec = Math.floor(new Date(rawTime).getTime() / 1000);
             scheduledTimeField = {
               name: "📅 Scheduled Start Time",
               value: `<t:${unixSec}:F>\n👉 **Countdown:** <t:${unixSec}:R>`,
               inline: false
             };
+          } else {
+            // No start time — stream is imminently starting, cron will catch it as LIVE shortly
+            console.log(`Video ${videoId} is live content but isLiveNow not set yet. Dropping — cron will catch it.`);
+            return;
           }
         }
       }
@@ -385,10 +392,12 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
       }
     }
     // Block VIDEO if LIVE was already posted (stream VOD showing up in WebSub after ending)
+    // Also block VIDEO if UPCOMING was already posted (means this video IS a live stream, not a regular video)
     if (videoType === "VIDEO") {
       const liveAlreadyPosted = await env.JEYSBOT_CACHE.get(`posted_${videoId}_LIVE`);
-      if (liveAlreadyPosted) {
-        console.log(`Video ${videoId}: LIVE already posted, skipping VIDEO (stream VOD). Dropping.`);
+      const upcomingAlreadyPosted = await env.JEYSBOT_CACHE.get(`posted_${videoId}_UPCOMING`);
+      if (liveAlreadyPosted || upcomingAlreadyPosted) {
+        console.log(`Video ${videoId}: Stream already tracked (LIVE/UPCOMING posted), skipping VIDEO. Dropping.`);
         return;
       }
     }
