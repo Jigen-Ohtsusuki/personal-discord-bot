@@ -15,6 +15,10 @@ COLOR_DEFINITIONS = [
     {"name": "Orange", "id": 1559349430623404103, "emoji": "🟠", "hex": "#ffa788"},
     {"name": "Yellow", "id": 1559349434020790272, "emoji": "🟡", "hex": "#f5ff88"},
     {"name": "Blue", "id": 1559349434909855804, "emoji": "🔵", "hex": "#88eaff"},
+    {"name": "Cyan", "id": 1566312929580552254, "emoji": "🩵", "hex": "#00f5d4"},
+    {"name": "Brown", "id": 1566312935792316456, "emoji": "🟤", "hex": "#b07a56"},
+    {"name": "White", "id": 1566312938938040410, "emoji": "⚪", "hex": "#ffffff"},
+    {"name": "Black", "id": 1566312941685444691, "emoji": "⚫", "hex": "#2b2d31"},
 ]
 
 ALL_COLOR_ROLE_IDS = {c["id"] for c in COLOR_DEFINITIONS}
@@ -151,20 +155,17 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
 
     async def post_color_menu(self, channel: discord.TextChannel) -> discord.Message:
         """Posts clean color picker embed in the target channel."""
+        desc_lines = [
+            "Personalize your appearance in the server! React with an emoji below to change your username color.\n\n"
+            "**Available Colors:**"
+        ]
+        for c in COLOR_DEFINITIONS:
+            desc_lines.append(f"{c['emoji']} **{c['name']}** (`{c['hex']}`)")
+        desc_lines.append("\n✨ **Exclusive:** You can only have **one color at a time**. Reacting to a new color will automatically remove your old reaction and switch your color!")
+
         embed = discord.Embed(
             title="🎨 Choose Your Name Color!",
-            description=(
-                "Personalize your appearance in the server! React with an emoji below to change your username color.\n\n"
-                "**Available Colors:**\n"
-                "🔴 **Red** (`#ff8890`)\n"
-                "🟣 **Purple** (`#aa88ff`)\n"
-                "🟢 **Green** (`#88ff90`)\n"
-                "🌸 **Pink** (`#fe88ff`)\n"
-                "🟠 **Orange** (`#ffa788`)\n"
-                "🟡 **Yellow** (`#f5ff88`)\n"
-                "🔵 **Blue** (`#88eaff`)\n\n"
-                "✨ **Exclusive:** You can only have **one color at a time**. Reacting to a new color will automatically remove your old reaction and switch your color!"
-            ),
+            description="\n".join(desc_lines),
             color=0xAA88FF
         )
         embed.set_footer(text="Jey's Bot 💜 • Exclusive Color Role Engine")
