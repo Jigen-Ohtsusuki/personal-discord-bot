@@ -3,46 +3,46 @@ import discord
 from typing import Optional, Tuple
 from services.youtube_detector import VideoType, YouTubeVideo
 
-# Distinct styling definitions per content type
+# Natural styling definitions per content type
 TYPE_STYLING = {
     VideoType.UPCOMING: {
-        "title_badge": "📅 SCHEDULED LIVE STREAM",
-        "embed_color": 0xF1C40F,  # Warm Gold / Calendar Yellow
-        "default_text": "⏰ **{creator}** just scheduled an upcoming live stream! Mark your calendars:",
-        "footer_text": "Jey's Bot 💜 • Scheduled Stream",
-        "button_label": "⏰ Set Reminder / View",
+        "title_badge": "📅 SCHEDULED STREAM",
+        "embed_color": 0xF1C40F,
+        "default_text": "**{creator}** scheduled a stream! set your reminders ⏰",
+        "footer_text": "Jey's Bot 💜",
+        "button_label": "Set Reminder",
         "emoji": "📅"
     },
     VideoType.LIVE: {
-        "title_badge": "🔴 LIVE NOW",
-        "embed_color": 0xFF0033,  # Vibrant Live Red
-        "default_text": "🚨 **{creator}** is **LIVE** right now! Jump in and join the chat!",
-        "footer_text": "Jey's Bot 💜 • Live Stream Alert",
-        "button_label": "▶ Watch Live Stream",
+        "title_badge": "🔴 LIVE",
+        "embed_color": 0xFF0033,
+        "default_text": "hey everyone, **{creator}** is live rn! come chill 💜",
+        "footer_text": "Jey's Bot 💜",
+        "button_label": "Watch Stream",
         "emoji": "🔴"
     },
     VideoType.SHORTS: {
         "title_badge": "🩳 NEW SHORT",
-        "embed_color": 0xFF5722,  # Short Orange-Red
-        "default_text": "⚡ **{creator}** dropped a new YouTube Short! Check it out below:",
-        "footer_text": "Jey's Bot 💜 • YouTube Shorts",
-        "button_label": "📱 Open Short",
+        "embed_color": 0xFF5722,
+        "default_text": "new short is out from **{creator}**! 📱",
+        "footer_text": "Jey's Bot 💜",
+        "button_label": "Watch Short",
         "emoji": "🩳"
     },
     VideoType.VIDEO: {
         "title_badge": "🎬 NEW VIDEO",
-        "embed_color": 0xCC0000,  # YouTube Red
-        "default_text": "🍿 **{creator}** just uploaded a brand new video!",
-        "footer_text": "Jey's Bot 💜 • Video Alert",
-        "button_label": "▶ Watch Video",
+        "embed_color": 0xCC0000,
+        "default_text": "new video is up from **{creator}**! go check it out 🎬",
+        "footer_text": "Jey's Bot 💜",
+        "button_label": "Watch Video",
         "emoji": "🎬"
     },
     VideoType.LIVE_VOD: {
-        "title_badge": "📼 STREAM REPLAY / VOD",
-        "embed_color": 0x8E24AA,  # Stream Purple
-        "default_text": "📼 Missed the live stream? The replay for **{creator}**'s stream is ready to watch!",
-        "footer_text": "Jey's Bot 💜 • Stream Replay Archive",
-        "button_label": "▶ Watch Stream VOD",
+        "title_badge": "📼 STREAM REPLAY",
+        "embed_color": 0x8E24AA,
+        "default_text": "the replay for **{creator}**'s stream is up!",
+        "footer_text": "Jey's Bot 💜",
+        "button_label": "Watch VOD",
         "emoji": "📼"
     }
 }

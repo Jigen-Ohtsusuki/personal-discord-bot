@@ -17,28 +17,27 @@ const DISCORD_CHANNELS = {
   SHORTS: "1566021006961811586"   // #shorts
 };
 
-// Lively, rotating community shoutouts
+// Natural, casual community messages (no AI/corporate hype)
 const LIVELY_MESSAGES = {
   LIVE: [
-    "🔥 Wake up community! **{creator}** is **LIVE** right now! Grab your snacks and jump in 💜",
-    "🚨 Stop scrolling! **{creator}** just hit the **GO LIVE** button! Get in the chat 🔥",
-    "🎮 Game faces on! **{creator}** is streaming live right now! Come hang out and show some love 💜",
-    "💜 The stream is LIVE! **{creator}** is in the lobby! Tap the button below to join the hype 🚀"
+    "hey everyone, **{creator}** is live rn! come chill 💜",
+    "**{creator}** just went live! hop in the stream 🎮",
+    "stream is live! come hang out with **{creator}** 💜",
+    "we live! come say hi in chat 🔥"
   ],
   UPCOMING: [
-    "⏰ Mark your calendars! **{creator}** just scheduled a new live stream! Set your reminders 🎯",
-    "📅 Upcoming stream alert! **{creator}** planned a new stream! Check the countdown below 💜",
-    "🔔 Don't miss it! **{creator}** scheduled a live session! Drop a reminder so you are there on time 🔥"
+    "**{creator}** scheduled a stream! set your reminders ⏰",
+    "new stream scheduled by **{creator}**! check the time below 💜"
   ],
   SHORTS: [
-    "⚡ Quick bite! **{creator}** just dropped a brand new Short! Tap below to watch 📱",
-    "🩳 Fresh Short alert! New clip from **{creator}** is out! Go show some love 💜",
-    "✨ New Short incoming! Check out what **{creator}** just posted 🔥"
+    "new short is out from **{creator}**! 📱",
+    "**{creator}** just posted a new short! 🩳",
+    "quick short just dropped by **{creator}** ✨"
   ],
   VIDEO: [
-    "🍿 New video drop! **{creator}** just uploaded a brand new video! Grab your popcorn 🎬",
-    "🎬 Fresh upload alert! A brand new video from **{creator}** is out now! Go check it out 💜",
-    "🔥 Drop everything! **{creator}** just released a new video! Tap below to watch 🍿"
+    "new video is up! go check it out 🎬",
+    "**{creator}** just uploaded a new video! 🍿",
+    "fresh video drop from **{creator}** 💜"
   ]
 };
 
@@ -270,7 +269,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
   let targetChannelId = DISCORD_CHANNELS.VIDEOS;
   let embedColor = 0xCC0000;
   let badge = "🎬 NEW VIDEO";
-  let buttonLabel = "▶ Watch Video";
+  let buttonLabel = "Watch Video";
   let videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   let scheduledTimeField = null;
   let videoDescription = "";
@@ -281,9 +280,9 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
     if (shortsRes.status === 200) {
       videoType = "SHORTS";
       targetChannelId = DISCORD_CHANNELS.SHORTS;
-      embedColor = 0xFF5722; // Neon Amber-Orange
+      embedColor = 0xFF5722;
       badge = "🩳 NEW SHORT";
-      buttonLabel = "📱 Open Short";
+      buttonLabel = "Watch Short";
       videoUrl = `https://www.youtube.com/shorts/${videoId}`;
     }
   } catch (e) {}
@@ -307,22 +306,21 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
         const shortDesc = pData?.videoDetails?.shortDescription;
 
         if (shortDesc) {
-          // Clean first 200 characters of creator's real description
           videoDescription = shortDesc.split("\n").filter(l => l.trim().length > 0).slice(0, 2).join("\n").slice(0, 200);
         }
 
         if (isLiveNow) {
           videoType = "LIVE";
           targetChannelId = DISCORD_CHANNELS.LIVE;
-          embedColor = 0xFF0033; // Vibrant Live Red
-          badge = "🔴 LIVE NOW";
-          buttonLabel = "▶ Watch Live Stream";
+          embedColor = 0xFF0033;
+          badge = "🔴 LIVE";
+          buttonLabel = "Watch Stream";
         } else if (isLiveContent && !liveDetails?.endTimestamp) {
           videoType = "UPCOMING";
           targetChannelId = DISCORD_CHANNELS.LIVE;
-          embedColor = 0xF1C40F; // Warm Gold
+          embedColor = 0xF1C40F;
           badge = "📅 SCHEDULED STREAM";
-          buttonLabel = "⏰ Set Reminder / View";
+          buttonLabel = "Set Reminder";
 
           // Extract real scheduled start time for dynamic countdown
           const rawTime = liveDetails?.startTimestamp || liveDetails?.scheduledStartTime;
@@ -369,7 +367,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
       url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
     },
     footer: {
-      text: "Jey's Bot 💜 • 24/7 Cloudflare Engine",
+      text: "Jey's Bot 💜",
       icon_url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
     },
     timestamp: new Date().toISOString()
