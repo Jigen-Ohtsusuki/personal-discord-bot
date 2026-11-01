@@ -19,7 +19,6 @@ class YouTubeCog(commands.Cog, name="YouTube Notifications"):
         self.bot = bot
         self.websub = WebSubManager(callback_handler=self.handle_incoming_push)
         self.websub_renewal_loop.start()
-        self.safety_sync_loop.start()
 
     async def cog_load(self):
         """Starts the WebSub webhook server when cog loads."""
@@ -27,7 +26,6 @@ class YouTubeCog(commands.Cog, name="YouTube Notifications"):
 
     def cog_unload(self):
         self.websub_renewal_loop.cancel()
-        self.safety_sync_loop.cancel()
         asyncio.create_task(self.websub.stop())
 
     def get_target_channel_for_type(
@@ -155,97 +153,6 @@ class YouTubeCog(commands.Cog, name="YouTube Notifications"):
 
     @websub_renewal_loop.before_loop
     async def before_renewal_loop(self):
-        await self.bot.wait_until_ready()
-
-    async def _fetch_rss_feed_ids(self, channel_id: str) -> list:
-        url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-        video_ids = []
-        try:
-            import aiohttp
-            import xml.etree.ElementTree as ET
-            timeout = aiohttp.ClientTimeout(total=6)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}) as resp:
-                    if resp.status == 200:
-                        text = await resp.text()
-                        root = ET.fromstring(text)
-                        ns = {'atom': 'http://www.w3.org/2005/Atom', 'yt': 'http://www.youtube.com/xml/schemas/2015'}
-                        for entry in root.findall('atom:entry', ns)[:3]:
-                            vid_elem = entry.find('yt:videoId', ns)
-                            if vid_elem is not None and vid_elem.text:
-                                video_ids.append(vid_elem.text)
-        except Exception:
-            pass
-        return video_ids
-
-    async def _check_live_endpoint(self, channel_id: str) -> Optional[str]:
-        """Directly checks YouTube's /channel/{id}/live to catch spontaneous live streams excluded from RSS."""
-        url = f"https://www.youtube.com/channel/{channel_id}/live"
-        try:
-            import aiohttp
-            import re
-            timeout = aiohttp.ClientTimeout(total=5)
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
-                async with session.get(url, allow_redirects=True) as resp:
-                    if resp.status == 200:
-                        final_url = str(resp.url)
-                        text = await resp.text()
-                        is_live = '{"text":" LIVE"}' in text or '"isLive":true' in text or '"isLiveNow":true' in text
-                        if is_live:
-                            canonical = re.search(r'<link rel="canonical" href="https://www.youtube.com/watch\?v=([a-zA-Z0-9_-]{11})">', text)
-                            if canonical:
-                                return canonical.group(1)
-                            elif "watch?v=" in final_url:
-                                return final_url.split("watch?v=")[1].split("&")[0]
-        except Exception:
-            pass
-        return None
-
-    # --- Lightweight Safety Sync Task (Every 35s) ---
-    @tasks.loop(seconds=35)
-    async def safety_sync_loop(self):
-        """
-        Safety Sync:
-        1. Checks /channel/{id}/live to instantly catch live streams (which YouTube omits from RSS).
-        2. Checks RSS feeds for new uploads, shorts, and scheduled events.
-        """
-        try:
-            channel_ids = await db.get_all_tracked_channel_ids()
-            for channel_id in channel_ids:
-                subs = await db.get_subscriptions_for_channel(channel_id)
-                if not subs:
-                    continue
-
-                # A. Check for active Live Streams first
-                live_vid = await self._check_live_endpoint(channel_id)
-                if live_vid:
-                    for sub in subs:
-                        gid = sub["guild_id"]
-                        if not await db.is_video_posted(live_vid, gid, "live"):
-                            logger.info(f"🔴 [Live Stream Detected] Creator {channel_id} is LIVE with {live_vid}!")
-                            await self.handle_incoming_push(live_vid, channel_id)
-                            break
-
-                # B. Check RSS feed for standard uploads, shorts, and scheduled events
-                feed_items = await self._fetch_rss_feed_ids(channel_id)
-                for video_id in feed_items:
-                    for sub in subs:
-                        gid = sub["guild_id"]
-                        already_posted = False
-                        for vt in ["video", "shorts", "live", "upcoming", "live_vod"]:
-                            if await db.is_video_posted(video_id, gid, vt):
-                                already_posted = True
-                                break
-                        if not already_posted:
-                            logger.info(f"⚡ [Safety Sync] Catching unposted content: {video_id} on {channel_id}")
-                            await self.handle_incoming_push(video_id, channel_id)
-                            break
-        except Exception as e:
-            logger.debug(f"Safety sync loop notice: {e}")
-
-    @safety_sync_loop.before_loop
-    async def before_safety_sync_loop(self):
         await self.bot.wait_until_ready()
 
     async def handle_incoming_push(self, video_id: str, channel_id: str):
