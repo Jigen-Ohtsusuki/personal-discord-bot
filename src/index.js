@@ -218,11 +218,18 @@ async function checkLiveStreams(env) {
 
       if (isLive) {
         let videoId = null;
-        const canonicalMatch = text.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})">/);
+        const canonicalMatch = text.match(/rel="canonical"\s+href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"/i)
+          || text.match(/href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"\s+rel="canonical"/i)
+          || text.match(/"liveStreamability".*?"videoId":"([a-zA-Z0-9_-]{11})"/s)
+          || text.match(/"watchEndpoint":{"videoId":"([a-zA-Z0-9_-]{11})"/);
+
         if (canonicalMatch) {
           videoId = canonicalMatch[1];
         } else if (res.url && res.url.includes("watch?v=")) {
           videoId = res.url.split("watch?v=")[1].split("&")[0];
+        } else {
+          const anyVid = text.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+          if (anyVid) videoId = anyVid[1];
         }
 
         if (videoId) {
