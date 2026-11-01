@@ -178,13 +178,37 @@ class YouTubeCog(commands.Cog, name="YouTube Notifications"):
             pass
         return video_ids
 
-    # --- Lightweight Safety Sync Task (Every 60s) ---
-    @tasks.loop(seconds=60)
+    async def _check_live_endpoint(self, channel_id: str) -> Optional[str]:
+        """Directly checks YouTube's /channel/{id}/live to catch spontaneous live streams excluded from RSS."""
+        url = f"https://www.youtube.com/channel/{channel_id}/live"
+        try:
+            import aiohttp
+            import re
+            timeout = aiohttp.ClientTimeout(total=5)
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+                async with session.get(url, allow_redirects=True) as resp:
+                    if resp.status == 200:
+                        final_url = str(resp.url)
+                        text = await resp.text()
+                        is_live = '{"text":" LIVE"}' in text or '"isLive":true' in text or '"isLiveNow":true' in text
+                        if is_live:
+                            canonical = re.search(r'<link rel="canonical" href="https://www.youtube.com/watch\?v=([a-zA-Z0-9_-]{11})">', text)
+                            if canonical:
+                                return canonical.group(1)
+                            elif "watch?v=" in final_url:
+                                return final_url.split("watch?v=")[1].split("&")[0]
+        except Exception:
+            pass
+        return None
+
+    # --- Lightweight Safety Sync Task (Every 35s) ---
+    @tasks.loop(seconds=35)
     async def safety_sync_loop(self):
         """
-        Safety Sync: Guarantees that if Google WebSub or an external webhook
-        ever delays or drops a push, new videos and shorts are automatically detected
-        and dispatched to Discord within 60 seconds.
+        Safety Sync:
+        1. Checks /channel/{id}/live to instantly catch live streams (which YouTube omits from RSS).
+        2. Checks RSS feeds for new uploads, shorts, and scheduled events.
         """
         try:
             channel_ids = await db.get_all_tracked_channel_ids()
@@ -192,6 +216,18 @@ class YouTubeCog(commands.Cog, name="YouTube Notifications"):
                 subs = await db.get_subscriptions_for_channel(channel_id)
                 if not subs:
                     continue
+
+                # A. Check for active Live Streams first
+                live_vid = await self._check_live_endpoint(channel_id)
+                if live_vid:
+                    for sub in subs:
+                        gid = sub["guild_id"]
+                        if not await db.is_video_posted(live_vid, gid, "live"):
+                            logger.info(f"🔴 [Live Stream Detected] Creator {channel_id} is LIVE with {live_vid}!")
+                            await self.handle_incoming_push(live_vid, channel_id)
+                            break
+
+                # B. Check RSS feed for standard uploads, shorts, and scheduled events
                 feed_items = await self._fetch_rss_feed_ids(channel_id)
                 for video_id in feed_items:
                     for sub in subs:
