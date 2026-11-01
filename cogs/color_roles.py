@@ -8,21 +8,25 @@ from discord.message import convert_emoji_reaction
 logger = logging.getLogger("ColorRoles")
 
 COLOR_DEFINITIONS = [
-    {"name": "Red", "id": 1559349426290430055, "emoji": "🔴", "hex": "#ff8890"},
-    {"name": "Purple", "id": 1559349427574022154, "emoji": "🟣", "hex": "#aa88ff"},
-    {"name": "Green", "id": 1559349428207222944, "emoji": "🟢", "hex": "#88ff90"},
-    {"name": "Pink", "id": 1559349429243346964, "emoji": "🌸", "hex": "#fe88ff"},
-    {"name": "Orange", "id": 1559349430623404103, "emoji": "🟠", "hex": "#ffa788"},
-    {"name": "Yellow", "id": 1559349434020790272, "emoji": "🟡", "hex": "#f5ff88"},
-    {"name": "Blue", "id": 1559349434909855804, "emoji": "🔵", "hex": "#88eaff"},
-    {"name": "Cyan", "id": 1566312929580552254, "emoji": "🩵", "hex": "#00f5d4"},
-    {"name": "Brown", "id": 1566312935792316456, "emoji": "🟤", "hex": "#b07a56"},
-    {"name": "White", "id": 1566312938938040410, "emoji": "⚪", "hex": "#ffffff"},
-    {"name": "Black", "id": 1566312941685444691, "emoji": "⚫", "hex": "#2b2d31"},
+    {"name": "Red", "emoji": "🔴", "hex": "#ff8890"},
+    {"name": "Purple", "emoji": "🟣", "hex": "#aa88ff"},
+    {"name": "Green", "emoji": "🟢", "hex": "#88ff90"},
+    {"name": "Pink", "emoji": "🌸", "hex": "#fe88ff"},
+    {"name": "Orange", "emoji": "🟠", "hex": "#ffa788"},
+    {"name": "Yellow", "emoji": "🟡", "hex": "#f5ff88"},
+    {"name": "Blue", "emoji": "🔵", "hex": "#88eaff"},
+    {"name": "Cyan", "emoji": "🩵", "hex": "#00f5d4"},
+    {"name": "Brown", "emoji": "🟤", "hex": "#b07a56"},
+    {"name": "White", "emoji": "⚪", "hex": "#ffffff"},
+    {"name": "Black", "emoji": "⚫", "hex": "#2b2d31"},
+    {"name": "Coral", "emoji": "🔺", "hex": "#ff4757"},
+    {"name": "Rose", "emoji": "🔻", "hex": "#ff6b81"},
+    {"name": "Amber", "emoji": "🔸", "hex": "#ffa502"},
+    {"name": "Aqua", "emoji": "🔹", "hex": "#00d2d3"},
+    {"name": "Slate", "emoji": "🔘", "hex": "#70a1ff"},
+    {"name": "Cobalt", "emoji": "🔷", "hex": "#1e90ff"},
 ]
 
-ALL_COLOR_ROLE_IDS = {c["id"] for c in COLOR_DEFINITIONS}
-ROLE_ID_TO_UNICODE = {c["id"]: c["emoji"] for c in COLOR_DEFINITIONS}
 COLOR_LOOKUP: Dict[str, Dict[str, Any]] = {c["emoji"]: c for c in COLOR_DEFINITIONS}
 COLOR_NAMES = {c["name"].lower(): c for c in COLOR_DEFINITIONS}
 ROLES_CHANNEL_ID = 1559330910132764782  # #roles
@@ -68,7 +72,7 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         if not guild.me.guild_permissions.manage_roles:
             return
 
-        color_names = ['Red', 'Purple', 'Green', 'Pink', 'Orange', 'Yellow', 'Blue']
+        color_names = [c["name"] for c in COLOR_DEFINITIONS]
         game_names = ['Minecraft', 'GTA', 'fortnite', 'Roblox', 'Among Us', 'Skribbl', 'GeoGuessr']
 
         roles = await guild.fetch_roles()
@@ -130,31 +134,7 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
                 logger.error(f"Error creating #roles channel: {e}")
         return channel
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        """Discovers or auto-provisions menu in #roles across any connected server."""
-        await self.bot.wait_until_ready()
-        for guild in self.bot.guilds:
-            await self.ensure_color_roles_exist(guild)
-            await self.organize_role_hierarchy(guild)
-
-            channel = await self.get_or_create_roles_channel(guild)
-            if not channel:
-                continue
-
-            found = False
-            async for msg in channel.history(limit=15):
-                if msg.author.id == self.bot.user.id and msg.embeds and "Choose Your Name Color" in (msg.embeds[0].title or ""):
-                    self.menu_message_id = msg.id
-                    found = True
-                    logger.info(f"Color Role Reaction Menu active in '{guild.name}' #{channel.name} (ID: {msg.id})")
-                    break
-
-            if not found and channel.permissions_for(guild.me).send_messages:
-                await self.post_color_menu(channel)
-
-    async def post_color_menu(self, channel: discord.TextChannel) -> discord.Message:
-        """Posts clean color picker embed in the target channel."""
+    def build_color_embed(self) -> discord.Embed:
         desc_lines = [
             "Personalize your appearance in the server! React with an emoji below to change your username color.\n\n"
             "**Available Colors:**"
@@ -169,6 +149,46 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
             color=0xAA88FF
         )
         embed.set_footer(text="Jey's Bot 💜 • Exclusive Color Role Engine")
+        return embed
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Discovers or auto-provisions menu in #roles across any connected server."""
+        await self.bot.wait_until_ready()
+        for guild in self.bot.guilds:
+            await self.ensure_color_roles_exist(guild)
+            await self.organize_role_hierarchy(guild)
+
+            channel = await self.get_or_create_roles_channel(guild)
+            if not channel:
+                continue
+
+            found_msg = None
+            async for msg in channel.history(limit=15):
+                if msg.author.id == self.bot.user.id and msg.embeds and "Choose Your Name Color" in (msg.embeds[0].title or ""):
+                    found_msg = msg
+                    self.menu_message_id = msg.id
+                    logger.info(f"Color Role Reaction Menu found in '{guild.name}' #{channel.name} (ID: {msg.id})")
+                    break
+
+            if found_msg:
+                # Update existing message with updated embed and missing reactions
+                try:
+                    await found_msg.edit(embed=self.build_color_embed())
+                    existing_reactions = {str(r.emoji) for r in found_msg.reactions}
+                    for c in COLOR_DEFINITIONS:
+                        if c["emoji"] not in existing_reactions:
+                            await found_msg.add_reaction(c["emoji"])
+                            await asyncio.sleep(0.3)
+                    logger.info(f"✨ Successfully updated color menu and reactions in '{guild.name}'")
+                except Exception as e:
+                    logger.error(f"Error updating existing color menu: {e}")
+            elif channel.permissions_for(guild.me).send_messages:
+                await self.post_color_menu(channel)
+
+    async def post_color_menu(self, channel: discord.TextChannel) -> discord.Message:
+        """Posts clean color picker embed in the target channel."""
+        embed = self.build_color_embed()
         msg = await channel.send(embed=embed)
         self.menu_message_id = msg.id
 
@@ -181,10 +201,8 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         return msg
 
     async def _resolve_target_role(self, guild: discord.Guild, target_info: Dict[str, Any]) -> Optional[discord.Role]:
-        """Finds role by ID or name, creating it dynamically if missing."""
-        role = guild.get_role(target_info["id"])
-        if not role:
-            role = discord.utils.get(guild.roles, name=target_info["name"])
+        """Finds role by name, creating it dynamically if missing."""
+        role = discord.utils.get(guild.roles, name=target_info["name"])
         if not role and guild.me.guild_permissions.manage_roles:
             try:
                 hex_int = int(target_info["hex"].lstrip("#"), 16)
@@ -232,18 +250,17 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
             target_role = await self._resolve_target_role(guild, target_info)
             current_roles = list(member.roles)
 
-            # Identify old color roles and emojis to strip (by ID or by name)
+            # Identify old color roles and emojis to strip (by name)
             roles_being_removed = [
                 r for r in current_roles
-                if (r.id in ALL_COLOR_ROLE_IDS or r.name.lower() in COLOR_NAMES)
+                if r.name.lower() in COLOR_NAMES
                 and (target_role is None or r.id != target_role.id)
             ]
-            old_emojis_to_remove = []
-            for r in roles_being_removed:
-                if r.id in ROLE_ID_TO_UNICODE:
-                    old_emojis_to_remove.append(ROLE_ID_TO_UNICODE[r.id])
-                elif r.name.lower() in COLOR_NAMES:
-                    old_emojis_to_remove.append(COLOR_NAMES[r.name.lower()]["emoji"])
+            old_emojis_to_remove = [
+                COLOR_NAMES[r.name.lower()]["emoji"]
+                for r in roles_being_removed
+                if r.name.lower() in COLOR_NAMES
+            ]
 
             # 1. Instantly remove previous reaction to clear old blue highlight
             for old_emoji in old_emojis_to_remove:
