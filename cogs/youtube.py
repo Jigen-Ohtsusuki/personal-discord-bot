@@ -189,16 +189,22 @@ class YouTubeCog(commands.Cog, name="YouTube Notifications"):
         try:
             channel_ids = await db.get_all_tracked_channel_ids()
             for channel_id in channel_ids:
+                subs = await db.get_subscriptions_for_channel(channel_id)
+                if not subs:
+                    continue
                 feed_items = await self._fetch_rss_feed_ids(channel_id)
                 for video_id in feed_items:
-                    already_posted = False
-                    for vt in ["video", "shorts", "live", "upcoming", "live_vod"]:
-                        if await db.is_video_posted(video_id, config.GUILD_ID, vt):
-                            already_posted = True
+                    for sub in subs:
+                        gid = sub["guild_id"]
+                        already_posted = False
+                        for vt in ["video", "shorts", "live", "upcoming", "live_vod"]:
+                            if await db.is_video_posted(video_id, gid, vt):
+                                already_posted = True
+                                break
+                        if not already_posted:
+                            logger.info(f"⚡ [Safety Sync] Catching unposted content: {video_id} on {channel_id}")
+                            await self.handle_incoming_push(video_id, channel_id)
                             break
-                    if not already_posted:
-                        logger.info(f"⚡ [Safety Sync] Catching unposted content: {video_id} on {channel_id}")
-                        await self.handle_incoming_push(video_id, channel_id)
         except Exception as e:
             logger.debug(f"Safety sync loop notice: {e}")
 
