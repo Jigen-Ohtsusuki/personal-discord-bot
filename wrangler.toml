@@ -5,3 +5,9 @@ compatibility_date = "2024-10-31"
 # 24/7 Cloudflare Serverless Cron Trigger (Every 1 minute)
 [triggers]
 crons = ["* * * * *"]
+
+# KV Namespace for persistent deduplication across all edge PoPs
+# Replace <NAMESPACE_ID> with the real ID from Cloudflare Dashboard → Workers & Pages → KV
+[[kv_namespaces]]
+binding = "JEYSBOT_CACHE"
+id = "<NAMESPACE_ID>"

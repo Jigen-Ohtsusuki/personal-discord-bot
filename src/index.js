@@ -259,6 +259,12 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
     return;
   }
 
+  // 0. Hard gate: channelId must be one of our tracked creators
+  if (!CREATORS[channelId]) {
+    console.warn(`Received event for unknown channel ${channelId}. Dropping.`);
+    return;
+  }
+
   // 1. Classify Content (Shorts vs Live vs Video)
   let videoType = "VIDEO";
   let targetChannelId = DISCORD_CHANNELS.VIDEOS;
@@ -345,13 +351,17 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
     return;
   }
 
-  // 2. Strict Deduplication per (videoId, videoType) using Cloudflare Cache
-  const cacheKey = `https://cache.jeysbot.local/posted/${videoId}_${videoType}`;
-  const cache = caches.default;
-  const existing = await cache.match(cacheKey);
-  if (existing) {
-    console.log(`Video ${videoId} [${videoType}] already posted. Skipping duplicate.`);
-    return;
+  // 2. Strict Deduplication per (videoId, videoType) using Cloudflare KV
+  // KV persists globally across all edge PoPs, unlike caches.default which is per-PoP
+  const kvKey = `posted_${videoId}_${videoType}`;
+  if (env.JEYSBOT_CACHE) {
+    const existing = await env.JEYSBOT_CACHE.get(kvKey);
+    if (existing) {
+      console.log(`Video ${videoId} [${videoType}] already posted (KV). Skipping duplicate.`);
+      return;
+    }
+  } else {
+    console.warn("JEYSBOT_CACHE KV namespace not bound — deduplication skipped! Bind it in Cloudflare dashboard.");
   }
 
   // 3. Format Lively Discord Embed
@@ -403,11 +413,10 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
 
   const success = await sendDiscordMessage(token, targetChannelId, payload);
   if (success) {
-    // Cache for 7 days to deduplicate
-    const cacheResponse = new Response("1", {
-      headers: { "Cache-Control": "max-age=604800" }
-    });
-    await cache.put(cacheKey, cacheResponse);
+    // Write to KV so every edge PoP knows this was already posted (7 day TTL)
+    if (env.JEYSBOT_CACHE) {
+      await env.JEYSBOT_CACHE.put(kvKey, "1", { expirationTtl: 604800 });
+    }
     console.log(`✅ Posted ${videoId} [${videoType}] to Discord channel ${targetChannelId}!`);
   }
 }
