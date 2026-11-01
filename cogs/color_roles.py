@@ -59,10 +59,54 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
                 except Exception as e:
                     logger.error(f"Failed to auto-create color role '{c['name']}': {e}")
 
+    async def organize_role_hierarchy(self, guild: discord.Guild):
+        """Ensures Color Roles are placed strictly ABOVE Game Roles so name colors take priority."""
+        if not guild.me.guild_permissions.manage_roles:
+            return
+
+        color_names = ['Red', 'Purple', 'Green', 'Pink', 'Orange', 'Yellow', 'Blue']
+        game_names = ['Minecraft', 'GTA', 'fortnite', 'Roblox', 'Among Us', 'Skribbl', 'GeoGuessr']
+
+        roles = await guild.fetch_roles()
+        role_map = {r.name.lower(): r for r in roles}
+
+        color_roles = [role_map[n.lower()] for n in color_names if n.lower() in role_map]
+        game_roles = [role_map[n.lower()] for n in game_names if n.lower() in role_map]
+
+        if not color_roles or not game_roles:
+            return
+
+        min_color_pos = min(r.position for r in color_roles)
+        max_game_pos = max(r.position for r in game_roles)
+
+        if min_color_pos > max_game_pos:
+            return  # Already perfectly sorted
+
+        positions = {}
+        current_pos = 1
+        for name in reversed(game_names):
+            r = role_map.get(name.lower())
+            if r:
+                positions[r] = current_pos
+                current_pos += 1
+
+        for name in reversed(color_names):
+            r = role_map.get(name.lower())
+            if r:
+                positions[r] = current_pos
+                current_pos += 1
+
+        try:
+            await guild.edit_role_positions(positions=positions)
+            logger.info(f"✨ Successfully organized role hierarchy (Colors above Games) in '{guild.name}'")
+        except Exception as e:
+            logger.debug(f"Hierarchy organize notice: {e}")
+
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild):
         """Auto-provisions color roles and menu when joining a new server."""
         await self.ensure_color_roles_exist(guild)
+        await self.organize_role_hierarchy(guild)
         channel = await self.get_or_create_roles_channel(guild)
         if channel:
             await self.post_color_menu(channel)
@@ -88,6 +132,7 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
             await self.ensure_color_roles_exist(guild)
+            await self.organize_role_hierarchy(guild)
 
             channel = await self.get_or_create_roles_channel(guild)
             if not channel:
