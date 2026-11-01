@@ -36,14 +36,60 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         return self._user_locks[user_id]
 
     async def cog_load(self):
-        logger.info("Color Roles cog loaded (Exclusive Reaction Engine).")
+        logger.info("Color Roles cog loaded (Exclusive Reaction Engine with Auto-Provisioning).")
+
+    async def ensure_color_roles_exist(self, guild: discord.Guild):
+        """Automatically creates the 7 color roles with their custom hex colors if missing."""
+        if not guild.me.guild_permissions.manage_roles:
+            return
+
+        existing_names = {r.name.lower(): r for r in guild.roles}
+        for c in COLOR_DEFINITIONS:
+            name_lower = c["name"].lower()
+            if name_lower not in existing_names:
+                try:
+                    hex_int = int(c["hex"].lstrip("#"), 16)
+                    new_role = await guild.create_role(
+                        name=c["name"],
+                        color=discord.Color(hex_int),
+                        mentionable=False,
+                        reason="Auto-created by Jey's Bot 💜 for community color customization"
+                    )
+                    logger.info(f"✨ Auto-created color role '{new_role.name}' ({c['hex']}) in '{guild.name}'")
+                except Exception as e:
+                    logger.error(f"Failed to auto-create color role '{c['name']}': {e}")
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild: discord.Guild):
+        """Auto-provisions color roles and menu when joining a new server."""
+        await self.ensure_color_roles_exist(guild)
+        channel = await self.get_or_create_roles_channel(guild)
+        if channel:
+            await self.post_color_menu(channel)
+
+    async def get_or_create_roles_channel(self, guild: discord.Guild) -> Optional[discord.TextChannel]:
+        """Finds #roles or creates it automatically if permissions allow."""
+        channel = self.bot.get_channel(ROLES_CHANNEL_ID) or discord.utils.get(guild.text_channels, name="roles")
+        if not channel and guild.me.guild_permissions.manage_channels:
+            try:
+                channel = await guild.create_text_channel(
+                    name="roles",
+                    topic="Personalize your name color and game roles! 💜",
+                    reason="Auto-created by Jey's Bot 💜 for role assignment"
+                )
+                logger.info(f"✨ Auto-created #roles channel in '{guild.name}'")
+            except Exception as e:
+                logger.error(f"Error creating #roles channel: {e}")
+        return channel
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Discovers or auto-provisions menu in #roles across any connected server."""
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
-            channel = self.bot.get_channel(ROLES_CHANNEL_ID) or discord.utils.get(guild.text_channels, name="roles")
+            await self.ensure_color_roles_exist(guild)
+
+            channel = await self.get_or_create_roles_channel(guild)
             if not channel:
                 continue
 
@@ -55,8 +101,7 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
                     logger.info(f"Color Role Reaction Menu active in '{guild.name}' #{channel.name} (ID: {msg.id})")
                     break
 
-            if not found and guild.me.guild_permissions.send_messages:
-                # Auto-deploy menu in new server
+            if not found and channel.permissions_for(guild.me).send_messages:
                 await self.post_color_menu(channel)
 
     async def post_color_menu(self, channel: discord.TextChannel) -> discord.Message:
@@ -89,11 +134,23 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
                 logger.debug(f"Reaction error: {e}")
         return msg
 
-    def _resolve_target_role(self, guild: discord.Guild, target_info: Dict[str, Any]) -> Optional[discord.Role]:
-        """Finds role by ID or by name (case-insensitive) for seamless multi-server portability."""
+    async def _resolve_target_role(self, guild: discord.Guild, target_info: Dict[str, Any]) -> Optional[discord.Role]:
+        """Finds role by ID or name, creating it dynamically if missing."""
         role = guild.get_role(target_info["id"])
         if not role:
             role = discord.utils.get(guild.roles, name=target_info["name"])
+        if not role and guild.me.guild_permissions.manage_roles:
+            try:
+                hex_int = int(target_info["hex"].lstrip("#"), 16)
+                role = await guild.create_role(
+                    name=target_info["name"],
+                    color=discord.Color(hex_int),
+                    mentionable=False,
+                    reason="Auto-created by Jey's Bot 💜 on reaction"
+                )
+                logger.info(f"✨ Auto-created color role '{role.name}' in {guild.name}")
+            except Exception as e:
+                logger.error(f"Error creating role on the fly: {e}")
         return role
 
     @commands.Cog.listener()
@@ -126,7 +183,7 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
             return
 
         async with self._get_user_lock(member.id):
-            target_role = self._resolve_target_role(guild, target_info)
+            target_role = await self._resolve_target_role(guild, target_info)
             current_roles = list(member.roles)
 
             # Identify old color roles and emojis to strip (by ID or by name)
@@ -192,7 +249,7 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         if not member or member.bot:
             return
 
-        target_role = self._resolve_target_role(guild, target_info)
+        target_role = await self._resolve_target_role(guild, target_info)
         if target_role and target_role in member.roles:
             try:
                 await member.remove_roles(target_role, reason="Unreacted color role")

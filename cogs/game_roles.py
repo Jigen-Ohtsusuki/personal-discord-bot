@@ -7,13 +7,13 @@ from discord.ext import commands
 logger = logging.getLogger("GameRoles")
 
 GAME_DEFINITIONS = [
-    {"name": "Minecraft", "id": 1559352088364978226, "emoji": "⛏️", "desc": "Sandbox & Survival"},
-    {"name": "GTA", "id": 1559352200696823908, "emoji": "🚗", "desc": "Grand Theft Auto & RP"},
-    {"name": "fortnite", "id": 1559352276324192356, "emoji": "🪂", "desc": "Battle Royale & Creative"},
-    {"name": "Roblox", "id": 1559352394624536626, "emoji": "🤖", "desc": "Roblox Games & Minigames"},
-    {"name": "Among Us", "id": 1559352458420162650, "emoji": "🚀", "desc": "Crewmates & Impostors"},
-    {"name": "Skribbl", "id": 1559352495417851974, "emoji": "✏️", "desc": "Drawing & Guessing"},
-    {"name": "GeoGuessr", "id": 1559352540502691910, "emoji": "🌍", "desc": "World Exploration & Geography"},
+    {"name": "Minecraft", "id": 1559352088364978226, "emoji": "⛏️", "hex": "#11806a", "desc": "Sandbox & Survival"},
+    {"name": "GTA", "id": 1559352200696823908, "emoji": "🚗", "hex": "#e67e22", "desc": "Grand Theft Auto & RP"},
+    {"name": "fortnite", "id": 1559352276324192356, "emoji": "🪂", "hex": "#3498db", "desc": "Battle Royale & Creative"},
+    {"name": "Roblox", "id": 1559352394624536626, "emoji": "🤖", "hex": "#607d8b", "desc": "Roblox Games & Minigames"},
+    {"name": "Among Us", "id": 1559352458420162650, "emoji": "🚀", "hex": "#e91e63", "desc": "Crewmates & Impostors"},
+    {"name": "Skribbl", "id": 1559352495417851974, "emoji": "✏️", "hex": "#f1c40f", "desc": "Drawing & Guessing"},
+    {"name": "GeoGuessr", "id": 1559352540502691910, "emoji": "🌍", "hex": "#206694", "desc": "World Exploration & Geography"},
 ]
 
 GAME_EMOJI_LOOKUP: Dict[str, Dict[str, Any]] = {g["emoji"]: g for g in GAME_DEFINITIONS}
@@ -47,23 +47,66 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
         self.menu_message_id: Optional[int] = None
 
     async def cog_load(self):
-        logger.info("Game Roles cog loaded.")
+        logger.info("Game Roles cog loaded (with Auto-Provisioning).")
 
-    def _resolve_game_role(self, guild: discord.Guild, game_info: Dict[str, Any]) -> Optional[discord.Role]:
-        """Finds game role by ID or by name (case-insensitive) for multi-server portability."""
+    async def ensure_game_roles_exist(self, guild: discord.Guild):
+        """Automatically creates the 7 game roles with custom colors if missing."""
+        if not guild.me.guild_permissions.manage_roles:
+            return
+
+        existing_names = {r.name.lower(): r for r in guild.roles}
+        for g in GAME_DEFINITIONS:
+            name_lower = g["name"].lower()
+            if name_lower not in existing_names:
+                try:
+                    hex_int = int(g["hex"].lstrip("#"), 16)
+                    new_role = await guild.create_role(
+                        name=g["name"],
+                        color=discord.Color(hex_int),
+                        mentionable=True,
+                        reason="Auto-created by Jey's Bot 💜 for game matchmaking"
+                    )
+                    logger.info(f"🎮 Auto-created game role '{new_role.name}' ({g['hex']}) in '{guild.name}'")
+                except Exception as e:
+                    logger.error(f"Failed to auto-create game role '{g['name']}': {e}")
+
+    async def _resolve_game_role(self, guild: discord.Guild, game_info: Dict[str, Any]) -> Optional[discord.Role]:
+        """Finds game role by ID or by name, auto-creating it if missing."""
         role = guild.get_role(game_info["id"])
         if not role:
             role = discord.utils.get(guild.roles, name=game_info["name"])
         if not role:
-            # Fallback case-insensitive match
             role = next((r for r in guild.roles if r.name.lower() == game_info["name"].lower()), None)
+
+        if not role and guild.me.guild_permissions.manage_roles:
+            try:
+                hex_int = int(game_info["hex"].lstrip("#"), 16)
+                role = await guild.create_role(
+                    name=game_info["name"],
+                    color=discord.Color(hex_int),
+                    mentionable=True,
+                    reason="Auto-created by Jey's Bot 💜 on reaction"
+                )
+                logger.info(f"🎮 Auto-created game role '{role.name}' in '{guild.name}'")
+            except Exception as e:
+                logger.error(f"Error creating game role on the fly: {e}")
         return role
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild: discord.Guild):
+        """Auto-provisions game roles and menu when joining a new server."""
+        await self.ensure_game_roles_exist(guild)
+        channel = self.bot.get_channel(ROLES_CHANNEL_ID) or discord.utils.get(guild.text_channels, name="roles")
+        if channel:
+            await self.post_game_menu(channel)
 
     @commands.Cog.listener()
     async def on_ready(self):
         """Auto-provisions or discovers the game role menu in #roles."""
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
+            await self.ensure_game_roles_exist(guild)
+
             channel = self.bot.get_channel(ROLES_CHANNEL_ID) or discord.utils.get(guild.text_channels, name="roles")
             if not channel:
                 continue
@@ -76,7 +119,7 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
                     logger.info(f"Game Role Menu active in '{guild.name}' #{channel.name} (ID: {msg.id})")
                     break
 
-            if not found:
+            if not found and channel.permissions_for(guild.me).send_messages:
                 try:
                     await self.post_game_menu(channel)
                 except Exception as e:
@@ -123,7 +166,7 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
         if not member or member.bot:
             return
 
-        target_role = self._resolve_game_role(guild, game_info)
+        target_role = await self._resolve_game_role(guild, game_info)
         if target_role and target_role not in member.roles:
             try:
                 await member.add_roles(target_role, reason=f"Selected {game_info['name']} game role")
@@ -158,7 +201,7 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
         if not member or member.bot:
             return
 
-        target_role = self._resolve_game_role(guild, game_info)
+        target_role = await self._resolve_game_role(guild, game_info)
         if target_role and target_role in member.roles:
             try:
                 await member.remove_roles(target_role, reason=f"Unselected {game_info['name']} game role")
