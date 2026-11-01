@@ -1,9 +1,7 @@
-name = "jeys-bot"
+name = "personal-discord-bot"
 main = "src/index.js"
 compatibility_date = "2024-10-31"
 
-# Environment Variables (Configure your Discord webhooks in Cloudflare dashboard or here)
-# [vars]
-# DISCORD_WEBHOOK_LIVE = "https://discord.com/api/webhooks/..."
-# DISCORD_WEBHOOK_VIDEOS = "https://discord.com/api/webhooks/..."
-# DISCORD_WEBHOOK_SHORTS = "https://discord.com/api/webhooks/..."
+# 24/7 Cloudflare Serverless Cron Trigger (Every 1 minute)
+[triggers]
+crons = ["* * * * *"]

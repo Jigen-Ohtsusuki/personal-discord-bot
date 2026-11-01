@@ -152,7 +152,16 @@ export default {
       });
     }
 
-    // 4. Incoming Real-Time Push Notification (POST)
+    // 4. Manual Live Check Endpoint (GET /check-live)
+    if (url.pathname.endsWith("/check-live")) {
+      const results = await checkLiveStreams(env);
+      return new Response(JSON.stringify({ status: "Live check complete", results }, null, 2), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    // 5. Incoming Real-Time Push Notification (POST)
     if (request.method === "POST" && (url.pathname.endsWith("/webhook") || url.pathname.endsWith("/youtube/webhook"))) {
       const text = await request.text();
       
@@ -175,11 +184,73 @@ export default {
     }
 
     return new Response(
-      "💜 Jey's Bot Cloudflare 24/7 Engine is LIVE!\nVisit /subscribe to register channels with Google WebSub.\nVisit /test-discord to test direct Discord delivery.",
+      "💜 Jey's Bot Cloudflare 24/7 Engine is LIVE!\nVisit /subscribe to register channels with Google WebSub.\nVisit /test-discord to test direct Discord delivery.\nVisit /check-live to run live stream detection.",
       { status: 200, headers: { "Content-Type": "text/plain" } }
     );
+  },
+
+  // Cloudflare Serverless Cron Trigger (Runs every 1 min in the cloud)
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(checkLiveStreams(env));
   }
 };
+
+async function checkLiveStreams(env) {
+  const token = env.DISCORD_TOKEN;
+  if (!token) {
+    console.error("DISCORD_TOKEN is missing in Cloudflare environment!");
+    return { error: "DISCORD_TOKEN missing" };
+  }
+
+  const results = {};
+  for (const [channelId, creator] of Object.entries(CREATORS)) {
+    try {
+      const res = await fetch(`https://www.youtube.com/channel/${channelId}/live`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9"
+        },
+        redirect: "follow"
+      });
+
+      if (!res.ok) {
+        results[creator] = `HTTP ${res.status}`;
+        continue;
+      }
+
+      const text = await res.text();
+      const isLive = text.includes('{"text":" LIVE"}') || text.includes('"isLive":true') || text.includes('"isLiveNow":true');
+
+      if (isLive) {
+        let videoId = null;
+        const canonicalMatch = text.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})">/);
+        if (canonicalMatch) {
+          videoId = canonicalMatch[1];
+        } else if (res.url && res.url.includes("watch?v=")) {
+          videoId = res.url.split("watch?v=")[1].split("&")[0];
+        }
+
+        if (videoId) {
+          let title = `${creator} is LIVE right now!`;
+          const titleMatch = text.match(/<title>(.*?)<\/title>/);
+          if (titleMatch && titleMatch[1]) {
+            title = titleMatch[1].replace(" - YouTube", "").trim();
+          }
+          await handleYouTubeEvent(videoId, channelId, title, creator, env);
+          results[creator] = `LIVE (${videoId}): Dispatched`;
+        } else {
+          results[creator] = "LIVE detected but Video ID not resolved";
+        }
+      } else {
+        results[creator] = "Offline";
+      }
+    } catch (err) {
+      console.error(`Error checking live status for ${creator}:`, err);
+      results[creator] = `Error: ${err.message}`;
+    }
+  }
+  return results;
+}
 
 async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env) {
   const token = env.DISCORD_TOKEN;
