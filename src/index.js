@@ -24,10 +24,10 @@ const LIVELY_MESSAGES = {
     "we live! come say hi in chat 🔥"
   ],
   STREAM_ENDED: [
-    "stream's over! if you missed it, the vod is up 👇",
-    "**{creator}**'s stream just ended! catch the replay below 💜",
-    "missed the stream? no worries, vod is right here 🎬",
-    "stream ended! you can still watch the full vod 👇"
+    "stream is ended! missed it? watch the full vod here 👇",
+    "**{creator}**'s stream ended! missed it? catch the vod below 💜",
+    "stream's over! missed the stream? watch the vod here 🎬",
+    "that's a wrap! missed it? you can watch the vod right here 👇"
   ],
   UPCOMING: [
     "**{creator}** scheduled a stream! set your reminders ⏰",
@@ -246,6 +246,18 @@ async function checkLiveStreams(env) {
           results[creator] = `LIVE (${videoId}): Detected, but token missing`;
         }
       } else {
+        // Channel is currently Offline — check if a live stream just ended
+        if (env.JEYSBOT_CACHE) {
+          const activeVideoId = await env.JEYSBOT_CACHE.get(`active_live_stream_${channelId}`);
+          if (activeVideoId) {
+            const alreadyEnded = await env.JEYSBOT_CACHE.get(`posted_${activeVideoId}_STREAM_ENDED`);
+            if (!alreadyEnded) {
+              console.log(`Live stream ${activeVideoId} for ${creator} ended. Triggering STREAM_ENDED edit...`);
+              await handleYouTubeEvent(activeVideoId, channelId, `${creator}'s Stream`, creator, env, false, true);
+            }
+            await env.JEYSBOT_CACHE.delete(`active_live_stream_${channelId}`);
+          }
+        }
         results[creator] = "Offline";
       }
     } catch (err) {
@@ -256,7 +268,7 @@ async function checkLiveStreams(env) {
   return results;
 }
 
-async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, onlyLive = false) {
+async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, onlyLive = false, forceStreamEnded = false) {
   const token = env.DISCORD_TOKEN || env.BOT_TOKEN || env.DISCORD_BOT_TOKEN || env.TOKEN;
   if (!token) {
     console.error("DISCORD_TOKEN is missing in Cloudflare environment!");
@@ -269,7 +281,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
     return;
   }
 
-  // 1. Classify Content (Shorts vs Live vs Video)
+  // 1. Classify Content (Shorts vs Live vs Video vs Stream Ended)
   let videoType = "VIDEO";
   let targetChannelId = DISCORD_CHANNELS.VIDEOS;
   let embedColor = 0xCC0000;
@@ -279,18 +291,28 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
   let scheduledTimeField = null;
   let videoDescription = "";
 
+  if (forceStreamEnded) {
+    videoType = "STREAM_ENDED";
+    targetChannelId = DISCORD_CHANNELS.LIVE;
+    embedColor = 0x7289DA;
+    badge = "📼 STREAM ENDED";
+    buttonLabel = "▶ Watch VOD";
+  }
+
   // Check if it's a Short (HTTP 200 on /shorts/ID vs 303 redirect to /watch)
-  try {
-    const shortsRes = await fetch(`https://www.youtube.com/shorts/${videoId}`, { redirect: "manual" });
-    if (shortsRes.status === 200) {
-      videoType = "SHORTS";
-      targetChannelId = DISCORD_CHANNELS.SHORTS;
-      embedColor = 0xFF5722;
-      badge = "🩳 NEW SHORT";
-      buttonLabel = "Watch Short";
-      videoUrl = `https://www.youtube.com/shorts/${videoId}`;
-    }
-  } catch (e) {}
+  if (!forceStreamEnded) {
+    try {
+      const shortsRes = await fetch(`https://www.youtube.com/shorts/${videoId}`, { redirect: "manual" });
+      if (shortsRes.status === 200) {
+        videoType = "SHORTS";
+        targetChannelId = DISCORD_CHANNELS.SHORTS;
+        embedColor = 0xFF5722;
+        badge = "🩳 NEW SHORT";
+        buttonLabel = "Watch Short";
+        videoUrl = `https://www.youtube.com/shorts/${videoId}`;
+      }
+    } catch (e) {}
+  }
 
   // Check details via InnerTube
   if (videoType !== "SHORTS") {
@@ -329,12 +351,12 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
           badge = "🔴 LIVE";
           buttonLabel = "Watch Stream";
         } else if (isLiveContent && liveDetails?.endTimestamp) {
-          // Stream has ended — post a "VOD is up" card to #live-streams instead of dropping
+          // Stream has ended — set to STREAM_ENDED to edit the live notification to a VOD card
           videoType = "STREAM_ENDED";
           targetChannelId = DISCORD_CHANNELS.LIVE;
           embedColor = 0x7289DA;
           badge = "📼 STREAM ENDED";
-          buttonLabel = "Watch VOD";
+          buttonLabel = "▶ Watch VOD";
         } else if (isLiveContent) {
           // isLiveContent=true but isLiveNow not confirmed yet (timing gap between schedule→live).
           // Could be UPCOMING or about to go live — either way NEVER send to #videos.
@@ -465,6 +487,8 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
       const edited = await editDiscordMessage(token, DISCORD_CHANNELS.LIVE, upcomingMsgId, payload);
       if (edited) {
         await env.JEYSBOT_CACHE.put(kvKey, "1", { expirationTtl: 604800 });
+        await env.JEYSBOT_CACHE.put(`live_msgid_${videoId}`, upcomingMsgId, { expirationTtl: 604800 });
+        await env.JEYSBOT_CACHE.put(`active_live_stream_${channelId}`, videoId, { expirationTtl: 86400 });
         console.log(`✅ Edited UPCOMING → LIVE for ${videoId} (msg ${upcomingMsgId})`);
         return;
       }
@@ -472,18 +496,42 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
     }
   }
 
-  const success = await sendDiscordMessage(token, targetChannelId, payload);
-  if (success) {
+  // If STREAM_ENDED is firing, EDIT the original stream notification to show VOD
+  if (videoType === "STREAM_ENDED" && env.JEYSBOT_CACHE) {
+    const liveMsgId = await env.JEYSBOT_CACHE.get(`live_msgid_${videoId}`);
+    if (liveMsgId) {
+      const edited = await editDiscordMessage(token, DISCORD_CHANNELS.LIVE, liveMsgId, payload);
+      if (edited) {
+        await env.JEYSBOT_CACHE.put(kvKey, "1", { expirationTtl: 604800 });
+        await env.JEYSBOT_CACHE.delete(`active_live_stream_${channelId}`);
+        console.log(`✅ Edited LIVE → STREAM_ENDED for ${videoId} (msg ${liveMsgId})`);
+        return;
+      }
+      // If edit fails, fall through to post a new message
+    }
+  }
+
+  const msgData = await sendDiscordMessage(token, targetChannelId, payload);
+  if (msgData) {
     // Write to KV so every edge PoP knows this was already posted (7 day TTL)
     if (env.JEYSBOT_CACHE) {
       await env.JEYSBOT_CACHE.put(kvKey, "1", { expirationTtl: 604800 });
-      // If this was an UPCOMING post, store the message ID so LIVE can edit it later
       if (videoType === "UPCOMING") {
-        const msgId = await getLastMessageId(token, targetChannelId);
+        const msgId = msgData.id;
         if (msgId) {
           await env.JEYSBOT_CACHE.put(`upcoming_msgid_${videoId}`, msgId, { expirationTtl: 604800 });
+          await env.JEYSBOT_CACHE.put(`live_msgid_${videoId}`, msgId, { expirationTtl: 604800 });
           console.log(`📌 Stored UPCOMING message ID ${msgId} for video ${videoId}`);
         }
+      } else if (videoType === "LIVE") {
+        const msgId = msgData.id;
+        if (msgId) {
+          await env.JEYSBOT_CACHE.put(`live_msgid_${videoId}`, msgId, { expirationTtl: 604800 });
+          await env.JEYSBOT_CACHE.put(`active_live_stream_${channelId}`, videoId, { expirationTtl: 86400 });
+          console.log(`📌 Stored LIVE message ID ${msgId} for video ${videoId}`);
+        }
+      } else if (videoType === "STREAM_ENDED") {
+        await env.JEYSBOT_CACHE.delete(`active_live_stream_${channelId}`);
       }
     }
     console.log(`✅ Posted ${videoId} [${videoType}] to Discord channel ${targetChannelId}!`);
@@ -500,10 +548,16 @@ async function sendDiscordMessage(token, channelId, payload) {
       },
       body: JSON.stringify(payload)
     });
-    return res.ok;
+    if (!res.ok) {
+      const err = await res.text();
+      console.error(`Error sending message to Discord channel ${channelId}:`, res.status, err);
+      return null;
+    }
+    const data = await res.json();
+    return data;
   } catch (e) {
     console.error(`Error sending message to Discord channel ${channelId}:`, e);
-    return false;
+    return null;
   }
 }
 
