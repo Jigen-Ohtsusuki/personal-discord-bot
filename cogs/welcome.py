@@ -59,23 +59,27 @@ def build_welcome_embed(guild: discord.Guild) -> discord.Embed:
         "*— MissJey's Team*"
     )
 
+    MISSJEY_AVATAR_URL = "https://yt3.googleusercontent.com/O143rEtFVDnaNLx5zkY4QcYIXpKuUMIWkAN_m7ZJeuE5qCGhPMXJqWzHhiChGeJtWZq_lEFKkQ=s900-c-k-c0x00ffffff-no-rj"
+    MISSJEY_BANNER_URL = "https://yt3.googleusercontent.com/AkXkJxzwHi4MMVOMMd-A3_sA_GV3EIuZmE3eeVncUa_k9zG4ZIiwsibMHfKN5PXeteYtp50V-Q=w1707"
+
     embed = discord.Embed(
         title="👋 WELCOME TO MISSJEY'S SERVER",
         description=description,
         color=0xAA88FF  # Soft aesthetic purple
     )
 
-    if guild.icon:
-        embed.set_thumbnail(url=guild.icon.url)
+    embed.set_thumbnail(url=MISSJEY_AVATAR_URL)
+    embed.set_image(url=MISSJEY_BANNER_URL)
 
     embed.set_footer(
         text="MissJey's Community 💜 • Official Welcome",
-        icon_url=guild.icon.url if guild.icon else None
+        icon_url=MISSJEY_AVATAR_URL
     )
     return embed
 
 
 def build_socials_embed() -> discord.Embed:
+    MISSJEY_AVATAR_URL = "https://yt3.googleusercontent.com/O143rEtFVDnaNLx5zkY4QcYIXpKuUMIWkAN_m7ZJeuE5qCGhPMXJqWzHhiChGeJtWZq_lEFKkQ=s900-c-k-c0x00ffffff-no-rj"
     description = (
         "Stay connected with MissJey across all platforms! Follow for live streams, highlights, stories & daily updates.\n\n"
         "📺 **YouTube** — [MissJey Gaming](https://www.youtube.com/@MissjeyGaming)\n"
@@ -88,7 +92,8 @@ def build_socials_embed() -> discord.Embed:
         description=description,
         color=0xE1306C  # Instagram / YouTube warm pink-red accent
     )
-    embed.set_footer(text="Official Socials • MissJey 💜")
+    embed.set_thumbnail(url=MISSJEY_AVATAR_URL)
+    embed.set_footer(text="Official Socials • MissJey 💜", icon_url=MISSJEY_AVATAR_URL)
     return embed
 
 
