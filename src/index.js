@@ -5,9 +5,7 @@
 
 // Target YouTube Creators
 const CREATORS = {
-  "UC12_jnxFlORtx9JjrnHPalg": "MissJey",
-  "UCdYi0XUhw5ANO96zeK70YfQ": "SIG07",
-  "UCO6Yn9mmANIMTVhpcOeZczQ": "Directioner"
+  "UC12_jnxFlORtx9JjrnHPalg": "MissJey"
 };
 
 // Discord Channel Routing
