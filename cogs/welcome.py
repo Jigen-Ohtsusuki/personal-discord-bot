@@ -49,10 +49,6 @@ def build_welcome_embed(guild: discord.Guild) -> discord.Embed:
         f"🖼️ {media_ref} — Share pictures, videos, and other media.\n\n"
         "🔊 **Voice Channels** — Find people to play with in duos, trios, and squads.\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "### ✦ OFFICIAL LINKS\n\n"
-        "📺 **YouTube** — [MissJey Gaming](https://www.youtube.com/@MissjeyGaming)\n\n"
-        "📸 **Instagram** — [@missjeyyyyy](https://www.instagram.com/missjeyyyyy/)\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "### ✦ A FEW THINGS TO REMEMBER\n\n"
         "• Respect everyone.\n"
         "• Keep conversations in their appropriate channels.\n"
@@ -79,7 +75,24 @@ def build_welcome_embed(guild: discord.Guild) -> discord.Embed:
     return embed
 
 
-def build_welcome_view() -> discord.ui.View:
+def build_socials_embed() -> discord.Embed:
+    description = (
+        "Stay connected with MissJey across all platforms! Follow for live streams, highlights, stories & daily updates.\n\n"
+        "📺 **YouTube** — [MissJey Gaming](https://www.youtube.com/@MissjeyGaming)\n"
+        "> Streams, gaming highlights, and shorts!\n\n"
+        "📸 **Instagram** — [@missjeyyyyy](https://www.instagram.com/missjeyyyyy/)\n"
+        "> Stream updates, photos, and behind-the-scenes!"
+    )
+    embed = discord.Embed(
+        title="🔗 MISSJEY'S OFFICIAL SOCIALS",
+        description=description,
+        color=0xE1306C  # Instagram / YouTube warm pink-red accent
+    )
+    embed.set_footer(text="Official Socials • MissJey 💜")
+    return embed
+
+
+def build_socials_view() -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     view.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label="YouTube Channel", emoji="📺", url="https://www.youtube.com/@MissjeyGaming"))
     view.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label="Instagram", emoji="📸", url="https://www.instagram.com/missjeyyyyy/"))
@@ -90,9 +103,10 @@ class WelcomeCog(commands.Cog, name="Welcome"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.welcome_message_id: Optional[int] = None
+        self.socials_message_id: Optional[int] = None
 
     async def cog_load(self):
-        logger.info("Welcome cog loaded (Auto-Provisioning Welcome Guide).")
+        logger.info("Welcome cog loaded (Auto-Provisioning Welcome Guide & Socials).")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -102,28 +116,47 @@ class WelcomeCog(commands.Cog, name="Welcome"):
             if not channel:
                 continue
 
-            found_msg = None
-            async for msg in channel.history(limit=15):
-                if msg.author.id == self.bot.user.id and msg.embeds and "WELCOME TO MISSJEY'S SERVER" in (msg.embeds[0].title or ""):
-                    found_msg = msg
-                    self.welcome_message_id = msg.id
-                    break
+            found_welcome_msg = None
+            found_socials_msg = None
 
-            embed = build_welcome_embed(guild)
-            view = build_welcome_view()
-            if found_msg:
+            async for msg in channel.history(limit=15):
+                if msg.author.id == self.bot.user.id and msg.embeds:
+                    title = msg.embeds[0].title or ""
+                    if "WELCOME TO MISSJEY'S SERVER" in title:
+                        found_welcome_msg = msg
+                    elif "OFFICIAL SOCIALS" in title:
+                        found_socials_msg = msg
+
+            # 1. Main Welcome Message
+            welcome_embed = build_welcome_embed(guild)
+            if found_welcome_msg:
                 try:
-                    await found_msg.edit(embed=embed, view=view)
+                    await found_welcome_msg.edit(embed=welcome_embed, view=None)
                     logger.info(f"✨ Updated Welcome guide in #{channel.name}")
                 except Exception as e:
                     logger.error(f"Error updating welcome guide: {e}")
             elif channel.permissions_for(guild.me).send_messages:
                 try:
-                    msg = await channel.send(embed=embed, view=view)
-                    self.welcome_message_id = msg.id
+                    msg = await channel.send(embed=welcome_embed)
                     logger.info(f"✨ Posted clean Welcome guide in #{channel.name} (ID: {msg.id})")
                 except Exception as e:
                     logger.error(f"Error posting welcome guide: {e}")
+
+            # 2. Separate Socials & Links Message
+            socials_embed = build_socials_embed()
+            socials_view = build_socials_view()
+            if found_socials_msg:
+                try:
+                    await found_socials_msg.edit(embed=socials_embed, view=socials_view)
+                    logger.info(f"✨ Updated Socials message in #{channel.name}")
+                except Exception as e:
+                    logger.error(f"Error updating socials message: {e}")
+            elif channel.permissions_for(guild.me).send_messages:
+                try:
+                    msg = await channel.send(embed=socials_embed, view=socials_view)
+                    logger.info(f"✨ Posted clean Socials message in #{channel.name} (ID: {msg.id})")
+                except Exception as e:
+                    logger.error(f"Error posting socials message: {e}")
 
 
 async def setup(bot: commands.Bot):
