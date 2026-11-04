@@ -49,6 +49,10 @@ def build_welcome_embed(guild: discord.Guild) -> discord.Embed:
         f"🖼️ {media_ref} — Share pictures, videos, and other media.\n\n"
         "🔊 **Voice Channels** — Find people to play with in duos, trios, and squads.\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "### ✦ OFFICIAL LINKS\n\n"
+        "📺 **YouTube** — [MissJey Gaming](https://www.youtube.com/@MissjeyGaming)\n\n"
+        "📸 **Instagram** — [@missjeyyyyy](https://www.instagram.com/missjeyyyyy/)\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         "### ✦ A FEW THINGS TO REMEMBER\n\n"
         "• Respect everyone.\n"
         "• Keep conversations in their appropriate channels.\n"
@@ -75,6 +79,13 @@ def build_welcome_embed(guild: discord.Guild) -> discord.Embed:
     return embed
 
 
+def build_welcome_view() -> discord.ui.View:
+    view = discord.ui.View(timeout=None)
+    view.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label="YouTube Channel", emoji="📺", url="https://www.youtube.com/@MissjeyGaming"))
+    view.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label="Instagram", emoji="📸", url="https://www.instagram.com/missjeyyyyy/"))
+    return view
+
+
 class WelcomeCog(commands.Cog, name="Welcome"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -99,15 +110,16 @@ class WelcomeCog(commands.Cog, name="Welcome"):
                     break
 
             embed = build_welcome_embed(guild)
+            view = build_welcome_view()
             if found_msg:
                 try:
-                    await found_msg.edit(embed=embed)
+                    await found_msg.edit(embed=embed, view=view)
                     logger.info(f"✨ Updated Welcome guide in #{channel.name}")
                 except Exception as e:
                     logger.error(f"Error updating welcome guide: {e}")
             elif channel.permissions_for(guild.me).send_messages:
                 try:
-                    msg = await channel.send(embed=embed)
+                    msg = await channel.send(embed=embed, view=view)
                     self.welcome_message_id = msg.id
                     logger.info(f"✨ Posted clean Welcome guide in #{channel.name} (ID: {msg.id})")
                 except Exception as e:
