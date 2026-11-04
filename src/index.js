@@ -286,7 +286,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
   let targetChannelId = DISCORD_CHANNELS.VIDEOS;
   let embedColor = 0xCC0000;
   let badge = "🎬 NEW VIDEO";
-  let buttonLabel = "Watch Video";
+  let buttonLabel = "▶ Watch Video";
   let videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   let scheduledTimeField = null;
   let videoDescription = "";
@@ -308,7 +308,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
         targetChannelId = DISCORD_CHANNELS.SHORTS;
         embedColor = 0xFF5722;
         badge = "🩳 NEW SHORT";
-        buttonLabel = "Watch Short";
+        buttonLabel = "📱 Watch Short";
         videoUrl = `https://www.youtube.com/shorts/${videoId}`;
       }
     } catch (e) {}
@@ -349,7 +349,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
           targetChannelId = DISCORD_CHANNELS.LIVE;
           embedColor = 0xFF0033;
           badge = "🔴 LIVE";
-          buttonLabel = "Watch Stream";
+          buttonLabel = "▶ Watch Live Stream";
         } else if (isLiveContent && liveDetails?.endTimestamp) {
           // Stream has ended — set to STREAM_ENDED to edit the live notification to a VOD card
           videoType = "STREAM_ENDED";
@@ -368,7 +368,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
             targetChannelId = DISCORD_CHANNELS.LIVE;
             embedColor = 0xF1C40F;
             badge = "📅 SCHEDULED STREAM";
-            buttonLabel = "Set Reminder";
+            buttonLabel = "⏰ Set Reminder";
             const unixSec = Math.floor(new Date(rawTime).getTime() / 1000);
             scheduledTimeField = {
               name: "📅 Scheduled Start Time",
@@ -421,11 +421,12 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
         return;
       }
     }
-    // Only post STREAM_ENDED if we actually posted LIVE for this video (otherwise it's an orphan)
+    // Only post STREAM_ENDED if we actually tracked LIVE or UPCOMING for this video
     if (videoType === "STREAM_ENDED") {
       const liveAlreadyPosted = await env.JEYSBOT_CACHE.get(`posted_${videoId}_LIVE`);
-      if (!liveAlreadyPosted) {
-        console.log(`Video ${videoId}: No LIVE post found, skipping orphan STREAM_ENDED.`);
+      const upcomingAlreadyPosted = await env.JEYSBOT_CACHE.get(`posted_${videoId}_UPCOMING`);
+      if (!liveAlreadyPosted && !upcomingAlreadyPosted) {
+        console.log(`Video ${videoId}: No LIVE or UPCOMING post found, skipping orphan STREAM_ENDED.`);
         return;
       }
     }
