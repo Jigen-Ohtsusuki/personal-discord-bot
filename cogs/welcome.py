@@ -60,7 +60,6 @@ def build_welcome_embed(guild: discord.Guild) -> discord.Embed:
     )
 
     MISSJEY_AVATAR_URL = "https://yt3.googleusercontent.com/O143rEtFVDnaNLx5zkY4QcYIXpKuUMIWkAN_m7ZJeuE5qCGhPMXJqWzHhiChGeJtWZq_lEFKkQ=s900-c-k-c0x00ffffff-no-rj"
-    MISSJEY_BANNER_URL = "https://yt3.googleusercontent.com/AkXkJxzwHi4MMVOMMd-A3_sA_GV3EIuZmE3eeVncUa_k9zG4ZIiwsibMHfKN5PXeteYtp50V-Q=w1707"
 
     embed = discord.Embed(
         title="👋 WELCOME TO MISSJEY'S SERVER",
@@ -69,7 +68,6 @@ def build_welcome_embed(guild: discord.Guild) -> discord.Embed:
     )
 
     embed.set_thumbnail(url=MISSJEY_AVATAR_URL)
-    embed.set_image(url=MISSJEY_BANNER_URL)
 
     embed.set_footer(
         text="MissJey's Community 💜 • Official Welcome",
