@@ -51,7 +51,8 @@ class GamingBot(commands.Bot):
             "cogs.color_roles",
             "cogs.game_roles",
             "cogs.notification_roles",
-            "cogs.welcome"
+            "cogs.welcome",
+            "cogs.rules"
         ]
 
         for extension in initial_extensions:
