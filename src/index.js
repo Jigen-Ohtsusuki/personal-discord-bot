@@ -477,10 +477,10 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
 
   // Dedicated Alert Role Pings
   const ALERT_ROLE_IDS = {
-    LIVE: "1567464086151761981",       // @Stream Alerts
-    UPCOMING: "1567464086151761981",   // @Stream Alerts
-    VIDEO: "1567464087779278921",      // @Video Alerts
-    SHORTS: "1567464087779278921"      // @Video Alerts
+    LIVE: "1567464086151761981",       // @Stream Alert
+    UPCOMING: "1567464086151761981",   // @Stream Alert
+    VIDEO: "1567464087779278921",      // @Video Alert
+    SHORTS: "1567464087779278921"      // @Video Alert
   };
 
   const rolePing = ALERT_ROLE_IDS[videoType] ? `<@&${ALERT_ROLE_IDS[videoType]}> ` : "";

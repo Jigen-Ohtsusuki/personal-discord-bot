@@ -7,11 +7,11 @@ from discord.ext import commands
 logger = logging.getLogger("NotificationRoles")
 
 NOTIFICATION_DEFINITIONS = [
-    {"name": "Stream Alerts", "emoji": "🔴", "desc": "Live streams & scheduled stream reminders"},
-    {"name": "Video Alerts", "emoji": "🟠", "desc": "New YouTube videos & Shorts uploads"},
-    {"name": "DC Alerts", "emoji": "📢", "desc": "Discord server announcements & news"},
-    {"name": "Event Alerts", "emoji": "🟢", "desc": "Community game nights & tournaments"},
-    {"name": "Giveaway Alerts", "emoji": "🟣", "desc": "Giveaways, drops & special rewards"},
+    {"name": "Stream Alert", "emoji": "🔴", "desc": "Live streams & scheduled stream reminders"},
+    {"name": "Video Alert", "emoji": "🟠", "desc": "New YouTube videos & Shorts uploads"},
+    {"name": "DC Alert", "emoji": "📢", "desc": "Discord server announcements & news"},
+    {"name": "Event Alert", "emoji": "🟢", "desc": "Community game nights & tournaments"},
+    {"name": "Giveaway Alert", "emoji": "🟣", "desc": "Giveaways, drops & special rewards"},
 ]
 
 NOTIFICATION_EMOJI_LOOKUP: Dict[str, Dict[str, Any]] = {n["emoji"]: n for n in NOTIFICATION_DEFINITIONS}
@@ -20,14 +20,14 @@ ROLES_CHANNEL_ID = 1559330910132764782  # #roles
 
 def build_notification_menu_embed() -> discord.Embed:
     embed = discord.Embed(
-        title="🔔 Choose Your Notification Alerts!",
+        title="🔔 Choose Your Notification Alert!",
         description=(
             "Never miss a moment! React below to get pinged for the alerts you care about.\n\n"
-            "🔴 **Stream Alerts** • Get pinged when MissJey goes live or schedules a stream\n"
-            "🟠 **Video Alerts** • New YouTube videos and Shorts drops\n"
-            "📢 **DC Alerts** • Discord server announcements & community updates\n"
-            "🟢 **Event Alerts** • Community game nights, lobbies & tournaments\n"
-            "🟣 **Giveaway Alerts** • Exclusive giveaways, nitro drops & rewards\n\n"
+            "🔴 **Stream Alert** • Get pinged when MissJey goes live or schedules a stream\n"
+            "🟠 **Video Alert** • New YouTube videos and Shorts drops\n"
+            "📢 **DC Alert** • Discord server announcements & community updates\n"
+            "🟢 **Event Alert** • Community game nights, lobbies & tournaments\n"
+            "🟣 **Giveaway Alert** • Exclusive giveaways, nitro drops & rewards\n\n"
             "✨ *React to claim an alert role. Remove your reaction anytime to opt out.*"
         ),
         color=0xFF7700
@@ -104,7 +104,7 @@ class NotificationRolesCog(commands.Cog, name="Notification Roles"):
 
             found_msg = None
             async for msg in channel.history(limit=25):
-                if msg.author.id == self.bot.user.id and msg.embeds and "Choose Your Notification Alerts" in (msg.embeds[0].title or ""):
+                if msg.author.id == self.bot.user.id and msg.embeds and "Choose Your Notification Alert" in (msg.embeds[0].title or ""):
                     found_msg = msg
                     self.menu_message_id = msg.id
                     logger.info(f"Notification Role Menu active in '{guild.name}' #{channel.name} (ID: {msg.id})")

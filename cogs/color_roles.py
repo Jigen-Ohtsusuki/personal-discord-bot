@@ -74,7 +74,7 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
 
         color_names = [c["name"] for c in COLOR_DEFINITIONS]
         game_names = ['Minecraft', 'GTA', 'fortnite', 'Roblox', 'Among Us', 'Skribbl', 'GeoGuessr']
-        notif_names = ['Stream Alerts', 'Video Alerts', 'DC Alerts', 'Event Alerts', 'Giveaway Alerts']
+        notif_names = ['Stream Alert', 'Video Alert', 'DC Alert', 'Event Alert', 'Giveaway Alert']
 
         roles = await guild.fetch_roles()
         role_map = {r.name.lower(): r for r in roles}
