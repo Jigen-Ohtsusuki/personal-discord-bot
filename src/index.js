@@ -475,8 +475,18 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
     }
   ];
 
+  // Dedicated Alert Role Pings
+  const ALERT_ROLE_IDS = {
+    LIVE: "1567464086151761981",       // @Stream Alerts
+    UPCOMING: "1567464086151761981",   // @Stream Alerts
+    VIDEO: "1567464087779278921",      // @Video Alerts
+    SHORTS: "1567464087779278921"      // @Video Alerts
+  };
+
+  const rolePing = ALERT_ROLE_IDS[videoType] ? `<@&${ALERT_ROLE_IDS[videoType]}> ` : "";
+
   const payload = {
-    content: `${getRandomMessage(videoType, creator)}\n${videoUrl}`,
+    content: `${rolePing}${getRandomMessage(videoType, creator)}\n${videoUrl}`,
     embeds: [embed],
     components: components
   };
@@ -490,7 +500,13 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
         await env.JEYSBOT_CACHE.put(kvKey, "1", { expirationTtl: 604800 });
         await env.JEYSBOT_CACHE.put(`live_msgid_${videoId}`, upcomingMsgId, { expirationTtl: 604800 });
         await env.JEYSBOT_CACHE.put(`active_live_stream_${channelId}`, videoId, { expirationTtl: 86400 });
-        console.log(`✅ Edited UPCOMING → LIVE for ${videoId} (msg ${upcomingMsgId})`);
+
+        // Send a fresh notification buzz so members with @Stream Alerts hear the ping when stream goes live
+        await sendDiscordMessage(token, DISCORD_CHANNELS.LIVE, {
+          content: `<@&1567464086151761981> **${creator} is now LIVE!** 🔴 Come chill: ${videoUrl}`
+        });
+
+        console.log(`✅ Edited UPCOMING → LIVE for ${videoId} (msg ${upcomingMsgId}) and sent stream alert ping`);
         return;
       }
       // If edit fails (message deleted etc.), fall through to send a new message
