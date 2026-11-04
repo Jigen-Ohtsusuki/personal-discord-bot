@@ -182,6 +182,10 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
         if payload.user_id == self.bot.user.id:
             return
 
+        # STRICT MESSAGE GATE: Only process reactions on the Game Menu message!
+        if not self.menu_message_id or payload.message_id != self.menu_message_id:
+            return
+
         emoji_str = str(payload.emoji.name)
         game_info = GAME_EMOJI_LOOKUP.get(emoji_str)
         if not game_info:
@@ -215,6 +219,10 @@ class GameRolesCog(commands.Cog, name="Game Roles"):
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
         """Removes game role when user unreacts."""
         if payload.user_id == self.bot.user.id:
+            return
+
+        # STRICT MESSAGE GATE: Only process reactions on the Game Menu message!
+        if not self.menu_message_id or payload.message_id != self.menu_message_id:
             return
 
         emoji_str = str(payload.emoji.name)

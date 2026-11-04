@@ -300,6 +300,10 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
         if payload.user_id == self.bot.user.id:
             return
 
+        # STRICT MESSAGE GATE: Only process reactions on the Color Menu message!
+        if not self.menu_message_id or payload.message_id != self.menu_message_id:
+            return
+
         emoji_str = str(payload.emoji.name)
         target_info = COLOR_LOOKUP.get(emoji_str)
         if not target_info:
@@ -364,6 +368,10 @@ class ColorRolesCog(commands.Cog, name="Color Roles"):
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
         """Revert to default color when unreacting."""
         if payload.user_id == self.bot.user.id:
+            return
+
+        # STRICT MESSAGE GATE: Only process reactions on the Color Menu message!
+        if not self.menu_message_id or payload.message_id != self.menu_message_id:
             return
 
         emoji_str = str(payload.emoji.name)

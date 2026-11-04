@@ -185,6 +185,10 @@ class NotificationRolesCog(commands.Cog, name="Notification Roles"):
         if payload.user_id == self.bot.user.id:
             return
 
+        # STRICT MESSAGE GATE: Only process reactions on the Notification Alerts Menu message!
+        if not self.menu_message_id or payload.message_id != self.menu_message_id:
+            return
+
         emoji_str = str(payload.emoji.name)
         notif_info = NOTIFICATION_EMOJI_LOOKUP.get(emoji_str)
         if not notif_info:
@@ -218,6 +222,10 @@ class NotificationRolesCog(commands.Cog, name="Notification Roles"):
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
         """Removes notification role when user unreacts."""
         if payload.user_id == self.bot.user.id:
+            return
+
+        # STRICT MESSAGE GATE: Only process reactions on the Notification Alerts Menu message!
+        if not self.menu_message_id or payload.message_id != self.menu_message_id:
             return
 
         emoji_str = str(payload.emoji.name)
