@@ -14,7 +14,7 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", str(BASE_DIR / "bot_database.db"))
 
 # Auto-Tracked YouTube Creators (Zero Commands Required)
 AUTO_TRACK_CHANNELS = [
-    c.strip() for c in os.getenv("AUTO_TRACK_CHANNELS", "@MissjeyGaming, @sig07, @DirectionerGaming").split(",")
+    c.strip() for c in os.getenv("AUTO_TRACK_CHANNELS", "@MissjeyGaming").split(",")
     if c.strip()
 ]
 
