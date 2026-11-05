@@ -140,7 +140,14 @@ class TimeoutModal(Modal):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
         except discord.Forbidden:
-            await interaction.followup.send("❌ **Permission Denied!** The bot's role is not high enough to timeout this user.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ **Permission Denied by Discord!**\n"
+                "Please check two things in **Server Settings ➔ Roles**:\n"
+                "1. **Permissions:** Grant the `Jey's Bot 💜` role the **Timeout Members** (or **Administrator**) permission.\n"
+                "2. **Hierarchy:** Drag the `Jey's Bot 💜` role **above** member roles in the list.\n"
+                "*(Note: Discord's API strictly forbids bots from timing out the Server Owner).* ",
+                ephemeral=True
+            )
         except Exception as e:
             logger.error(f"Error executing timeout: {e}", exc_info=True)
             await interaction.followup.send(f"❌ **Error executing timeout:** {e}", ephemeral=True)
@@ -206,7 +213,14 @@ class KickModal(Modal):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
         except discord.Forbidden:
-            await interaction.followup.send("❌ **Permission Denied!** The bot cannot kick this member due to role hierarchy.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ **Permission Denied by Discord!**\n"
+                "Please check two things in **Server Settings ➔ Roles**:\n"
+                "1. **Permissions:** Grant the `Jey's Bot 💜` role the **Kick Members** (or **Administrator**) permission.\n"
+                "2. **Hierarchy:** Drag the `Jey's Bot 💜` role **above** member roles in the list.\n"
+                "*(Note: Discord does not permit kicking the Server Owner).* ",
+                ephemeral=True
+            )
         except Exception as e:
             logger.error(f"Error kicking member: {e}", exc_info=True)
             await interaction.followup.send(f"❌ **Error kicking member:** {e}", ephemeral=True)
@@ -286,7 +300,14 @@ class BanModal(Modal):
             await interaction.followup.send(embed=embed, ephemeral=True)
 
         except discord.Forbidden:
-            await interaction.followup.send("❌ **Permission Denied!** The bot cannot ban this member due to role hierarchy.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ **Permission Denied by Discord!**\n"
+                "Please check two things in **Server Settings ➔ Roles**:\n"
+                "1. **Permissions:** Grant the `Jey's Bot 💜` role the **Ban Members** (or **Administrator**) permission.\n"
+                "2. **Hierarchy:** Drag the `Jey's Bot 💜` role **above** member roles in the list.\n"
+                "*(Note: Discord does not permit banning the Server Owner).* ",
+                ephemeral=True
+            )
         except Exception as e:
             logger.error(f"Error banning member: {e}", exc_info=True)
             await interaction.followup.send(f"❌ **Error banning member:** {e}", ephemeral=True)
@@ -502,17 +523,28 @@ class ModerationCog(commands.Cog, name="Moderation"):
         if target.id == moderator.id:
             return "❌ You cannot moderate yourself!"
         if target.id == guild.owner_id:
-            return "❌ You cannot moderate the Server Owner!"
+            return "❌ You cannot moderate the Server Owner! (Discord strictly protects the owner from timeouts/kicks/bans)."
         if target.id == self.bot.user.id:
             return "❌ You cannot moderate the bot!"
         
+        # Check bot permissions
+        bot_perms = guild.me.guild_permissions
+        if not (bot_perms.administrator or bot_perms.moderate_members or bot_perms.kick_members or bot_perms.ban_members):
+            return (
+                "❌ **Bot Missing Permissions!**\n"
+                "In **Server Settings ➔ Roles**, please grant **`Jey's Bot 💜`** the **Timeout Members**, **Kick Members**, and **Ban Members** permissions (or **Administrator**)."
+            )
+
         # Check hierarchy if moderator is not owner
         if moderator.id != guild.owner_id and target.top_role >= moderator.top_role:
-            return f"❌ You cannot moderate {target.mention} because their role is equal or higher than yours!"
+            return f"❌ You cannot moderate {target.mention} because their role (`{target.top_role.name}`) is equal to or higher than yours!"
             
         # Check if bot can moderate
         if target.top_role >= guild.me.top_role:
-            return f"❌ I cannot moderate {target.mention} because their role is higher than or equal to my highest role!"
+            return (
+                f"❌ I cannot moderate {target.mention} because their role (`{target.top_role.name}`) is higher than or equal to my highest role (`{guild.me.top_role.name}`)!\n"
+                f"👉 Please drag **`Jey's Bot 💜`** higher in **Server Settings ➔ Roles**."
+            )
             
         return None
 
