@@ -272,6 +272,16 @@ async function checkLiveStreams(env) {
           results[creator] = `LIVE (${videoId}): Detected, but token missing`;
         }
       } else {
+        results[`${creator}_debug`] = {
+          status: res.status,
+          resUrl: res.url,
+          videoId: videoId,
+          textLen: text ? text.length : 0,
+          hasLiveTrue: text.includes('"isLive":true'),
+          hasLiveContent: text.includes('"isLiveContent":true'),
+          hasLiveStreamability: text.includes('"liveStreamability"'),
+          title: (text.match(/<title>(.*?)<\/title>/) || [])[1]
+        };
         // Channel is currently Offline — check if a live stream just ended
         if (env.JEYSBOT_CACHE) {
           const activeVideoId = await env.JEYSBOT_CACHE.get(`active_live_stream_${channelId}`);
