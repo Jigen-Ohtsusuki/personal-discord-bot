@@ -52,7 +52,8 @@ class GamingBot(commands.Bot):
             "cogs.game_roles",
             "cogs.notification_roles",
             "cogs.welcome",
-            "cogs.rules"
+            "cogs.rules",
+            "cogs.moderation"
         ]
 
         for extension in initial_extensions:
@@ -62,17 +63,18 @@ class GamingBot(commands.Bot):
             except Exception as e:
                 logger.error(f"Failed to load extension {extension}: {e}", exc_info=True)
 
-        # 3. Clear Slash Commands (100% automated background mode - zero commands needed)
+        # 3. Sync Slash Commands & Context Menus
         try:
-            self.tree.clear_commands(guild=None)
             if config.GUILD_ID:
                 guild_obj = discord.Object(id=int(config.GUILD_ID))
-                self.tree.clear_commands(guild=guild_obj)
-                await self.tree.sync(guild=guild_obj)
-            await self.tree.sync()
-            logger.info("Cleared slash commands. Running in zero-command automated mode.")
+                self.tree.copy_global_to(guild=guild_obj)
+                synced = await self.tree.sync(guild=guild_obj)
+                logger.info(f"✨ Synced {len(synced)} commands instantly to guild {config.GUILD_ID}!")
+            else:
+                synced = await self.tree.sync()
+                logger.info(f"✨ Synced {len(synced)} commands globally!")
         except Exception as e:
-            logger.debug(f"Command tree sync: {e}")
+            logger.error(f"Command tree sync error: {e}", exc_info=True)
 
     async def on_ready(self):
         logger.info(f"=======================================")

@@ -47,6 +47,32 @@ class Database:
                 )
             """)
 
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS mod_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    target_id TEXT NOT NULL,
+                    target_name TEXT NOT NULL,
+                    moderator_id TEXT NOT NULL,
+                    moderator_name TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    duration TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS warnings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    moderator_id TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
+
             await db.commit()
 
     async def add_subscription(
@@ -197,5 +223,47 @@ class Database:
             cursor = await db.execute(query, tuple(params))
             await db.commit()
             return cursor.rowcount > 0
+
+    async def log_mod_action(
+        self,
+        guild_id: str,
+        action: str,
+        target_id: str,
+        target_name: str,
+        moderator_id: str,
+        moderator_name: str,
+        reason: str,
+        duration: Optional[str] = None
+    ) -> int:
+        """Logs a moderation action to the database and returns the new case ID."""
+        now = datetime.now(timezone.utc).isoformat()
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("""
+                INSERT INTO mod_logs (guild_id, action, target_id, target_name, moderator_id, moderator_name, reason, duration, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (str(guild_id), action, str(target_id), target_name, str(moderator_id), moderator_name, reason, duration, now))
+            await db.commit()
+            return cursor.lastrowid
+
+    async def add_warning(self, guild_id: str, user_id: str, moderator_id: str, reason: str) -> int:
+        """Adds a warning for a user."""
+        now = datetime.now(timezone.utc).isoformat()
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("""
+                INSERT INTO warnings (guild_id, user_id, moderator_id, reason, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (str(guild_id), str(user_id), str(moderator_id), reason, now))
+            await db.commit()
+            return cursor.lastrowid
+
+    async def get_warnings(self, guild_id: str, user_id: str) -> List[Dict[str, Any]]:
+        """Retrieves all warnings for a user."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("""
+                SELECT * FROM warnings WHERE guild_id = ? AND user_id = ? ORDER BY id DESC
+            """, (str(guild_id), str(user_id))) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
 
 db = Database()
