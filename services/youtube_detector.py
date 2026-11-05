@@ -438,12 +438,12 @@ class YouTubeDetector:
 
             # Duration and flags
             length_sec = int(video_details.get("lengthSeconds", "0"))
-            is_live_content = video_details.get("isLiveContent", False)
-            is_live_now = live_broadcast_details.get("isLiveNow", False)
+            is_live_content = video_details.get("isLiveContent", False) or video_details.get("isLive", False)
+            is_live_now = live_broadcast_details.get("isLiveNow", False) or video_details.get("isLive", False)
             has_ended = bool(live_broadcast_details.get("endTimestamp"))
 
             # Determine exact category
-            if is_live_now:
+            if is_live_now or (is_live_content and length_sec == 0 and not has_ended):
                 v_type = VideoType.LIVE
             elif is_live_content and not has_ended and not is_live_now:
                 v_type = VideoType.UPCOMING

@@ -164,7 +164,25 @@ export default {
       });
     }
 
-    // 5. Incoming Real-Time Push Notification (POST)
+    // 5. Admin Sync Live Stream Endpoint (GET /sync-live?videoId=...&msgId=...)
+    if (url.pathname.endsWith("/sync-live")) {
+      const vId = url.searchParams.get("videoId") || "SfQXXWDTFLY";
+      const mId = url.searchParams.get("msgId") || "1567780862043623529";
+      const cId = url.searchParams.get("channelId") || "UC12_jnxFlORtx9JjrnHPalg";
+      if (env.JEYSBOT_CACHE) {
+        await env.JEYSBOT_CACHE.put(`live_msgid_${vId}`, mId, { expirationTtl: 604800 });
+        await env.JEYSBOT_CACHE.put(`active_live_stream_${cId}`, vId, { expirationTtl: 86400 });
+        await env.JEYSBOT_CACHE.put(`posted_${vId}_LIVE`, "1", { expirationTtl: 604800 });
+        await env.JEYSBOT_CACHE.delete(`posted_${vId}_VIDEO`);
+        return new Response(JSON.stringify({ status: "Synced active live stream", videoId: vId, messageId: mId }, null, 2), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      return new Response("No JEYSBOT_CACHE binding found", { status: 500 });
+    }
+
+    // 6. Incoming Real-Time Push Notification (POST)
     if (request.method === "POST" && (url.pathname.endsWith("/webhook") || url.pathname.endsWith("/youtube/webhook"))) {
       const text = await request.text();
       
@@ -221,7 +239,8 @@ async function checkLiveStreams(env) {
       // Strict check: Must have canonical watch URL OR redirect URL to watch?v=
       let videoId = null;
       const canonicalMatch = text.match(/rel="canonical"\s+href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"/i)
-        || text.match(/href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"\s+rel="canonical"/i);
+        || text.match(/href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"\s+rel="canonical"/i)
+        || text.match(/<link\s+rel="canonical"\s+href="https:\/\/www\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})"/i);
 
       if (canonicalMatch) {
         videoId = canonicalMatch[1];
@@ -229,8 +248,15 @@ async function checkLiveStreams(env) {
         videoId = res.url.split("watch?v=")[1].split("&")[0];
       }
 
-      // Must be actively broadcasting live right now
-      const isLiveNow = videoId && (text.includes('"isLiveNow":true') || text.includes('"status":"LIVE"') || text.includes('"liveBroadcastDetails":{"isLiveNow":true'));
+      // Robust check: YouTube indicates live status through several keys on /live page
+      const isLiveNow = videoId && (
+        text.includes('"isLive":true') ||
+        text.includes('"isLiveContent":true') ||
+        text.includes('"liveStreamability"') ||
+        text.includes('"isLiveNow":true') ||
+        text.includes('"status":"LIVE"') ||
+        text.includes('liveIndicatorText')
+      );
 
       if (isLiveNow && videoId) {
         let title = `${creator} is LIVE rn!`;
@@ -282,7 +308,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
   }
 
   // 1. Classify Content (Shorts vs Live vs Video vs Stream Ended)
-  let videoType = "VIDEO";
+  let videoType = null;
   let targetChannelId = DISCORD_CHANNELS.VIDEOS;
   let embedColor = 0xCC0000;
   let badge = "🎬 NEW VIDEO";
@@ -300,7 +326,7 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
   }
 
   // Check if it's a Short (HTTP 200 on /shorts/ID vs 303 redirect to /watch)
-  if (!forceStreamEnded) {
+  if (!videoType) {
     try {
       const shortsRes = await fetch(`https://www.youtube.com/shorts/${videoId}`, { redirect: "manual" });
       if (shortsRes.status === 200) {
@@ -314,75 +340,128 @@ async function handleYouTubeEvent(videoId, channelId, rawTitle, creator, env, on
     } catch (e) {}
   }
 
-  // Check details via InnerTube
-  if (videoType !== "SHORTS") {
+  // Deep inspection for Livestreams, Upcoming, VODs, and regular Videos
+  if (!videoType) {
+    let pData = null;
+    let htmlText = "";
+
+    // Method A: InnerTube Player API
     try {
       const playerRes = await fetch("https://www.youtube.com/youtubei/v1/player", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+          "X-YouTube-Client-Name": "1",
+          "X-YouTube-Client-Version": "2.20241030.01.00"
+        },
         body: JSON.stringify({
-          context: { client: { clientName: "WEB", clientVersion: "2.20241030.01.00" } },
+          context: {
+            client: {
+              clientName: "WEB",
+              clientVersion: "2.20241030.01.00",
+              hl: "en",
+              gl: "US"
+            }
+          },
           videoId: videoId
         })
       });
       if (playerRes.ok) {
-        const pData = await playerRes.json();
-        
-        // Strict channel verification: The video MUST belong to the tracked creator!
-        const actualChannelId = pData?.videoDetails?.channelId;
-        if (actualChannelId && actualChannelId !== channelId) {
-          console.warn(`Video ${videoId} belongs to ${actualChannelId}, not ${channelId}. Skipping.`);
-          return;
-        }
-
-        const liveDetails = pData?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails;
-        const isLiveNow = liveDetails?.isLiveNow;
-        const isLiveContent = pData?.videoDetails?.isLiveContent;
-        const shortDesc = pData?.videoDetails?.shortDescription;
-
-        if (shortDesc) {
-          videoDescription = shortDesc.split("\n").filter(l => l.trim().length > 0).slice(0, 2).join("\n").slice(0, 200);
-        }
-
-        if (isLiveNow) {
-          videoType = "LIVE";
-          targetChannelId = DISCORD_CHANNELS.LIVE;
-          embedColor = 0xFF0033;
-          badge = "🔴 LIVE";
-          buttonLabel = "▶ Watch Live Stream";
-        } else if (isLiveContent && liveDetails?.endTimestamp) {
-          // Stream has ended — set to STREAM_ENDED to edit the live notification to a VOD card
-          videoType = "STREAM_ENDED";
-          targetChannelId = DISCORD_CHANNELS.LIVE;
-          embedColor = 0x7289DA;
-          badge = "📼 STREAM ENDED";
-          buttonLabel = "▶ Watch VOD";
-        } else if (isLiveContent) {
-          // isLiveContent=true but isLiveNow not confirmed yet (timing gap between schedule→live).
-          // Could be UPCOMING or about to go live — either way NEVER send to #videos.
-          // Treat as UPCOMING if we have a start time, otherwise drop silently and let the
-          // cron prober catch it as LIVE in the next cycle.
-          const rawTime = liveDetails?.startTimestamp || liveDetails?.scheduledStartTime;
-          if (rawTime) {
-            videoType = "UPCOMING";
-            targetChannelId = DISCORD_CHANNELS.LIVE;
-            embedColor = 0xF1C40F;
-            badge = "📅 SCHEDULED STREAM";
-            buttonLabel = "⏰ Set Reminder";
-            const unixSec = Math.floor(new Date(rawTime).getTime() / 1000);
-            scheduledTimeField = {
-              name: "📅 Scheduled Start Time",
-              value: `<t:${unixSec}:F>\n👉 **Countdown:** <t:${unixSec}:R>`,
-              inline: false
-            };
-          } else {
-            // No start time — stream is imminently starting, cron will catch it as LIVE shortly
-            console.log(`Video ${videoId} is live content but isLiveNow not set yet. Dropping — cron will catch it.`);
-            return;
-          }
-        }
+        pData = await playerRes.json();
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn(`InnerTube player check error for ${videoId}:`, e);
+    }
+
+    // Method B: Direct HTML Fetch (100% resilient fallback)
+    try {
+      const watchRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9"
+        }
+      });
+      if (watchRes.ok) {
+        htmlText = await watchRes.text();
+      }
+    } catch (e) {
+      console.warn(`HTML watch page check error for ${videoId}:`, e);
+    }
+
+    // Strict channel verification: The video MUST belong to the tracked creator!
+    const actualChannelId = pData?.videoDetails?.channelId;
+    if (actualChannelId && actualChannelId !== channelId) {
+      console.warn(`Video ${videoId} belongs to ${actualChannelId}, not ${channelId}. Skipping.`);
+      return;
+    }
+
+    const liveDetails = pData?.microformat?.playerMicroformatRenderer?.liveBroadcastDetails;
+    const isLiveNow = Boolean(
+      liveDetails?.isLiveNow ||
+      pData?.videoDetails?.isLive ||
+      htmlText.includes('"isLive":true') ||
+      htmlText.includes('"isLiveNow":true') ||
+      htmlText.includes('"liveStreamability"') ||
+      htmlText.includes('liveIndicatorText')
+    );
+
+    const isLiveContent = Boolean(
+      pData?.videoDetails?.isLiveContent ||
+      pData?.videoDetails?.isLive ||
+      htmlText.includes('"isLiveContent":true') ||
+      htmlText.includes('"isLive":true')
+    );
+
+    const lengthSeconds = parseInt(pData?.videoDetails?.lengthSeconds || "0", 10);
+    const hasEnded = Boolean(
+      liveDetails?.endTimestamp ||
+      htmlText.includes('"endTimestamp":')
+    );
+
+    const shortDesc = pData?.videoDetails?.shortDescription;
+    if (shortDesc) {
+      videoDescription = shortDesc.split("\n").filter(l => l.trim().length > 0).slice(0, 2).join("\n").slice(0, 200);
+    }
+
+    if (hasEnded && isLiveContent) {
+      // Completed livestream VOD
+      videoType = "STREAM_ENDED";
+      targetChannelId = DISCORD_CHANNELS.LIVE;
+      embedColor = 0x7289DA;
+      badge = "📼 STREAM ENDED";
+      buttonLabel = "▶ Watch VOD";
+    } else if (isLiveNow || (isLiveContent && lengthSeconds === 0)) {
+      // Actively broadcasting Live Stream
+      videoType = "LIVE";
+      targetChannelId = DISCORD_CHANNELS.LIVE;
+      embedColor = 0xFF0033;
+      badge = "🔴 LIVE";
+      buttonLabel = "▶ Watch Live Stream";
+    } else if (isLiveContent) {
+      // Scheduled / Upcoming stream
+      const rawTime = liveDetails?.startTimestamp || liveDetails?.scheduledStartTime;
+      videoType = "UPCOMING";
+      targetChannelId = DISCORD_CHANNELS.LIVE;
+      embedColor = 0xF1C40F;
+      badge = "📅 SCHEDULED STREAM";
+      buttonLabel = "⏰ Set Reminder";
+      if (rawTime) {
+        const unixSec = Math.floor(new Date(rawTime).getTime() / 1000);
+        scheduledTimeField = {
+          name: "📅 Scheduled Start Time",
+          value: `<t:${unixSec}:F>\n👉 **Countdown:** <t:${unixSec}:R>`,
+          inline: false
+        };
+      }
+    } else {
+      // Standard regular video
+      videoType = "VIDEO";
+      targetChannelId = DISCORD_CHANNELS.VIDEOS;
+      embedColor = 0xCC0000;
+      badge = "🎬 NEW VIDEO";
+      buttonLabel = "▶ Watch Video";
+    }
   }
 
   // If called from live-stream prober, NEVER post if not actively live!
