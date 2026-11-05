@@ -174,6 +174,7 @@ export default {
         await env.JEYSBOT_CACHE.put(`active_live_stream_${cId}`, vId, { expirationTtl: 86400 });
         await env.JEYSBOT_CACHE.put(`posted_${vId}_LIVE`, "1", { expirationTtl: 604800 });
         await env.JEYSBOT_CACHE.delete(`posted_${vId}_VIDEO`);
+        await env.JEYSBOT_CACHE.delete(`posted_${vId}_STREAM_ENDED`);
         return new Response(JSON.stringify({ status: "Synced active live stream", videoId: vId, messageId: mId }, null, 2), {
           status: 200,
           headers: { "Content-Type": "application/json" }
@@ -272,16 +273,6 @@ async function checkLiveStreams(env) {
           results[creator] = `LIVE (${videoId}): Detected, but token missing`;
         }
       } else {
-        results[`${creator}_debug`] = {
-          status: res.status,
-          resUrl: res.url,
-          videoId: videoId,
-          textLen: text ? text.length : 0,
-          hasLiveTrue: text.includes('"isLive":true'),
-          hasLiveContent: text.includes('"isLiveContent":true'),
-          hasLiveStreamability: text.includes('"liveStreamability"'),
-          title: (text.match(/<title>(.*?)<\/title>/) || [])[1]
-        };
         // Channel is currently Offline — check if a live stream just ended
         if (env.JEYSBOT_CACHE) {
           const activeVideoId = await env.JEYSBOT_CACHE.get(`active_live_stream_${channelId}`);
