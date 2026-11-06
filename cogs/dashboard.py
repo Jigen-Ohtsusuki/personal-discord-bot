@@ -265,10 +265,10 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
           });
           const d = await res.json();
           if (d.success) {
-            addToast('success', 'Master authorization verified');
+            addToast('success', 'Signed in successfully!');
             checkAuth();
           } else {
-            addToast('error', 'Invalid security passcode');
+            addToast('error', 'Wrong passcode, please try again.');
           }
         } catch (err) {
           addToast('error', err.message);
@@ -283,7 +283,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
       const executeModeration = async (e) => {
         e.preventDefault();
         if (!selectedGuildId || !modTarget) {
-          addToast('error', 'Please select a target member');
+          addToast('error', 'Please pick a member first!');
           return;
         }
         setIsSubmitting(true);
@@ -333,10 +333,10 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
           });
           const data = await res.json();
           if (data.success) {
-            addToast('success', 'Server channel configuration updated');
+            addToast('success', 'Channels saved successfully!');
             fetchGuildData(selectedGuildId);
           } else {
-            addToast('error', data.error || 'Failed to update settings');
+            addToast('error', data.error || 'Failed to save channels');
           }
         } catch (err) {
           addToast('error', err.message);
@@ -352,7 +352,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
           });
           const data = await res.json();
           if (data.success) {
-            addToast('success', `${type.toUpperCase()} embed published to channel`);
+            addToast('success', `${type.toUpperCase()} message updated in Discord!`);
             fetchGuildData(selectedGuildId);
           } else {
             addToast('error', data.error || 'Sync failed');
@@ -378,7 +378,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
           <div className="flex-1 flex items-center justify-center">
             <div className="flex items-center gap-3 text-surface-muted text-sm font-mono tracking-wider">
               <span className="w-2 h-2 rounded-full bg-brand-500 animate-ping"></span>
-              INITIALIZING CONTROL CENTER...
+              Loading dashboard...
             </div>
           </div>
         );
@@ -393,13 +393,13 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                 <img src={MISSJEY_AVATAR} alt="Bot Icon" className="w-9 h-9 rounded-full ring-2 ring-brand-500/40 object-cover shadow-lg shadow-brand-glow" />
                 <div>
                   <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
-                    Jey Control Suite
+                    Jey's Bot Control Center
                     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                       24/7 VPS
                     </span>
                   </h1>
-                  <span className="text-xs text-surface-muted font-medium">Enterprise Discord Operations</span>
+                  <span className="text-xs text-surface-muted font-medium">Simple control center for your Discord servers</span>
                 </div>
               </div>
 
@@ -495,7 +495,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                       {/* Members */}
                       <div className="bg-surface-card border border-surface-border hover:border-brand-500/30 rounded-2xl p-5 transition-all">
                         <div className="flex items-center justify-between text-surface-muted mb-3">
-                          <span className="text-xs font-semibold uppercase tracking-wider">Server Members</span>
+                          <span className="text-xs font-semibold uppercase tracking-wider">Total Members</span>
                           <div className="p-2 rounded-lg bg-surface-cardHover border border-surface-border">
                             <IconUsers className="w-4 h-4 text-brand-400" />
                           </div>
@@ -511,7 +511,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                       {/* Latency */}
                       <div className="bg-surface-card border border-surface-border hover:border-brand-500/30 rounded-2xl p-5 transition-all">
                         <div className="flex items-center justify-between text-surface-muted mb-3">
-                          <span className="text-xs font-semibold uppercase tracking-wider">Gateway Latency</span>
+                          <span className="text-xs font-semibold uppercase tracking-wider">Bot Speed (Ping)</span>
                           <div className="p-2 rounded-lg bg-surface-cardHover border border-surface-border">
                             <IconZap className="w-4 h-4 text-emerald-400" />
                           </div>
@@ -522,14 +522,14 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                         </div>
                         <div className="text-[11px] text-emerald-400/90 mt-2 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                          Optimal WebSocket connection
+                          Fast response time
                         </div>
                       </div>
 
                       {/* Memory */}
                       <div className="bg-surface-card border border-surface-border hover:border-brand-500/30 rounded-2xl p-5 transition-all">
                         <div className="flex items-center justify-between text-surface-muted mb-3">
-                          <span className="text-xs font-semibold uppercase tracking-wider">VPS Memory</span>
+                          <span className="text-xs font-semibold uppercase tracking-wider">Memory Used</span>
                           <div className="p-2 rounded-lg bg-surface-cardHover border border-surface-border">
                             <IconCpu className="w-4 h-4 text-brand-400" />
                           </div>
@@ -539,14 +539,14 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                           <span className="text-xs font-normal text-surface-muted font-sans">MB</span>
                         </div>
                         <div className="text-[11px] text-surface-muted mt-2">
-                          Ubuntu 24.04 LTS (NVMe High-Speed)
+                          Cloud server running smoothly
                         </div>
                       </div>
 
                       {/* Uptime */}
                       <div className="bg-surface-card border border-surface-border hover:border-brand-500/30 rounded-2xl p-5 transition-all">
                         <div className="flex items-center justify-between text-surface-muted mb-3">
-                          <span className="text-xs font-semibold uppercase tracking-wider">Instance Uptime</span>
+                          <span className="text-xs font-semibold uppercase tracking-wider">Online For</span>
                           <div className="p-2 rounded-lg bg-surface-cardHover border border-surface-border">
                             <IconClock className="w-4 h-4 text-amber-400" />
                           </div>
@@ -555,7 +555,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                           {stats?.uptime_str ?? "—"}
                         </div>
                         <div className="text-[11px] text-surface-muted mt-2">
-                          Persistent systemd automation
+                          Running non-stop 24/7
                         </div>
                       </div>
                     </div>
@@ -564,20 +564,18 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                     <div className="bg-surface-card border border-surface-border rounded-2xl p-6">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-surface-border">
                         <div>
-                          <span className="text-xs font-mono text-brand-400 tracking-wider uppercase font-semibold">Protected Environment</span>
+                          <span className="text-xs font-mono text-brand-400 tracking-wider uppercase font-semibold">Active Server</span>
                           <h2 className="text-xl font-bold text-white mt-1">{selectedGuild?.name || "Server Operations"}</h2>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-brand-500/10 text-brand-400 border border-brand-500/20">
                             <IconShield className="w-3.5 h-3.5" />
-                            Strict Per-Guild Isolation
+                            Your server's private data
                           </span>
                         </div>
                       </div>
                       <p className="text-sm text-surface-muted mt-4 leading-relaxed max-w-3xl">
-                        This session is authenticated with direct Discord Administrator permissions for this server. 
-                        All moderation operations, warning databases, and channel routing are compartmentalized. Actions performed here 
-                        will execute immediately on Discord without latency.
+                        You are managing this server with Admin rights. Any actions you take here (mutes, kicks, warnings, channel settings) happen on Discord in real time.
                       </p>
                     </div>
                   </div>
@@ -590,19 +588,19 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                     <div className="lg:col-span-5 bg-surface-card border border-surface-border rounded-2xl p-6">
                       <div className="flex items-center gap-2 mb-5 pb-3 border-b border-surface-border">
                         <IconShield className="w-4 h-4 text-brand-400" />
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-white">Execute Moderation</h2>
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-white">Moderate a Member</h2>
                       </div>
 
                       <form onSubmit={executeModeration} className="space-y-4">
                         <div>
-                          <label className="block text-xs font-semibold text-surface-muted mb-2">Target Member</label>
+                          <label className="block text-xs font-semibold text-surface-muted mb-2">Choose Member</label>
                           <select 
                             value={modTarget} 
                             onChange={e => setModTarget(e.target.value)}
                             required
                             className="w-full bg-surface-cardHover border border-surface-border focus:border-brand-500 rounded-xl px-3.5 py-2.5 text-sm text-white outline-none transition-colors"
                           >
-                            <option value="" disabled>Select target server member...</option>
+                            <option value="" disabled>Pick a member...</option>
                             {members.map(m => (
                               <option key={m.id} value={m.id}>{m.name} (@{m.tag})</option>
                             ))}
@@ -610,14 +608,14 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                         </div>
 
                         <div>
-                          <label className="block text-xs font-semibold text-surface-muted mb-2">Disciplinary Action</label>
+                          <label className="block text-xs font-semibold text-surface-muted mb-2">Choose Action</label>
                           <div className="grid grid-cols-2 gap-2">
                             {[
-                              { id: "TIMEOUT", label: "Timeout (Mute)" },
-                              { id: "REMOVE_TIMEOUT", label: "Remove Timeout" },
-                              { id: "WARN", label: "Issue Warning" },
-                              { id: "KICK", label: "Kick Member" },
-                              { id: "BAN", label: "Ban Member" },
+                              { id: "TIMEOUT", label: "Mute (Timeout)" },
+                              { id: "REMOVE_TIMEOUT", label: "Unmute" },
+                              { id: "WARN", label: "Warn" },
+                              { id: "KICK", label: "Kick" },
+                              { id: "BAN", label: "Ban" },
                             ].map(act => (
                               <button
                                 key={act.id}
@@ -633,7 +631,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
 
                         {modAction === "TIMEOUT" && (
                           <div>
-                            <label className="block text-xs font-semibold text-surface-muted mb-2">Timeout Duration</label>
+                            <label className="block text-xs font-semibold text-surface-muted mb-2">Mute Duration</label>
                             <select 
                               value={modDuration} 
                               onChange={e => setModDuration(e.target.value)}
@@ -649,10 +647,10 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                         )}
 
                         <div>
-                          <label className="block text-xs font-semibold text-surface-muted mb-2">Audit Reason</label>
+                          <label className="block text-xs font-semibold text-surface-muted mb-2">Reason</label>
                           <input 
                             type="text" 
-                            placeholder="E.g. Inappropriate behavior, spam in voice/text"
+                            placeholder="Why? (e.g. spamming, breaking rules)"
                             value={modReason} 
                             onChange={e => setModReason(e.target.value)}
                             required
@@ -666,7 +664,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                           className="w-full mt-2 py-3 px-4 rounded-xl font-semibold text-xs tracking-wider uppercase bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-glow flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                           <IconCheckCircle className="w-4 h-4" />
-                          {isSubmitting ? "Processing..." : `Dispatch ${modAction}`}
+                          {isSubmitting ? "Processing..." : `Apply ${modAction}`}
                         </button>
                       </form>
                     </div>
@@ -676,19 +674,19 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-3 border-b border-surface-border">
                         <div className="flex items-center gap-2">
                           <IconFileText className="w-4 h-4 text-brand-400" />
-                          <h2 className="text-sm font-bold uppercase tracking-wider text-white">Guild Audit Log</h2>
+                          <h2 className="text-sm font-bold uppercase tracking-wider text-white">Recent Mod History</h2>
                         </div>
                         <div className="flex items-center gap-2">
                           <input 
                             type="text"
-                            placeholder="Search logs..."
+                            placeholder="Search history..."
                             value={logFilter}
                             onChange={e => setLogFilter(e.target.value)}
                             className="bg-surface-cardHover border border-surface-border rounded-lg px-2.5 py-1 text-xs text-white placeholder-surface-muted outline-none w-36 focus:w-48 transition-all"
                           />
                           <button 
                             onClick={() => fetchGuildData(selectedGuildId)}
-                            title="Refresh Audit Logs"
+                            title="Refresh history"
                             className="p-1.5 rounded-lg bg-surface-cardHover border border-surface-border text-surface-muted hover:text-white transition-colors"
                           >
                             <IconRefresh className="w-3.5 h-3.5" />
@@ -702,7 +700,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                             <tr className="border-b border-surface-border text-surface-muted uppercase font-mono tracking-wider">
                               <th className="py-2.5 px-3">Case</th>
                               <th className="py-2.5 px-3">Action</th>
-                              <th className="py-2.5 px-3">Target</th>
+                              <th className="py-2.5 px-3">Member</th>
                               <th className="py-2.5 px-3">Moderator</th>
                               <th className="py-2.5 px-3">Reason</th>
                             </tr>
@@ -711,7 +709,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                             {filteredLogs.length === 0 ? (
                               <tr>
                                 <td colSpan="5" className="py-12 text-center text-surface-muted">
-                                  No moderation logs recorded for this server yet.
+                                  No mod actions taken on this server yet.
                                 </td>
                               </tr>
                             ) : (
@@ -753,15 +751,15 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                   <div className="max-w-2xl mx-auto bg-surface-card border border-surface-border rounded-2xl p-7">
                     <div className="flex items-center gap-2 mb-2 pb-3 border-b border-surface-border">
                       <IconSliders className="w-4 h-4 text-brand-400" />
-                      <h2 className="text-sm font-bold uppercase tracking-wider text-white">Channel Routing & Roles</h2>
+                      <h2 className="text-sm font-bold uppercase tracking-wider text-white">Server Channels & Roles</h2>
                     </div>
                     <p className="text-xs text-surface-muted mb-6 leading-relaxed">
-                      Select which text channels on <strong className="text-white">{selectedGuild?.name}</strong> receive YouTube notifications, onboarding guides, and server rules.
+                      Choose which channels the bot should use on <strong className="text-white">{selectedGuild?.name}</strong> for welcome messages, rules, and YouTube alerts.
                     </p>
 
                     <form onSubmit={handleSaveSettings} className="space-y-4">
                       <div>
-                        <label className="block text-xs font-semibold text-surface-muted mb-2">Welcome & Guide Channel</label>
+                        <label className="block text-xs font-semibold text-surface-muted mb-2">Welcome Channel</label>
                         <select 
                           name="welcome" 
                           defaultValue={guildChannels.settings.welcome_channel_id || ""}
@@ -775,7 +773,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-surface-muted mb-2">Rules & Guidelines Channel</label>
+                        <label className="block text-xs font-semibold text-surface-muted mb-2">Rules Channel</label>
                         <select 
                           name="rules" 
                           defaultValue={guildChannels.settings.rules_channel_id || ""}
@@ -789,7 +787,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-surface-muted mb-2">YouTube Live Stream Channel</label>
+                        <label className="block text-xs font-semibold text-surface-muted mb-2">YouTube Live Alerts Channel</label>
                         <select 
                           name="stream" 
                           defaultValue={guildChannels.settings.stream_channel_id || ""}
@@ -803,7 +801,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-surface-muted mb-2">YouTube Videos & Shorts Channel</label>
+                        <label className="block text-xs font-semibold text-surface-muted mb-2">YouTube Videos Channel</label>
                         <select 
                           name="video" 
                           defaultValue={guildChannels.settings.video_channel_id || ""}
@@ -817,13 +815,13 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold text-surface-muted mb-2">Live Stream Ping Role</label>
+                        <label className="block text-xs font-semibold text-surface-muted mb-2">Role to Ping for Streams</label>
                         <select 
                           name="role" 
                           defaultValue={guildChannels.settings.stream_ping_role_id || ""}
                           className="w-full bg-surface-cardHover border border-surface-border focus:border-brand-500 rounded-xl px-3.5 py-2.5 text-sm text-white outline-none"
                         >
-                          <option value="">(None / Auto-detect @Stream Alert)</option>
+                          <option value="">(None / Default @Stream Alert)</option>
                           {guildChannels.roles.map(r => (
                             <option key={r.id} value={r.id}>@{r.name}</option>
                           ))}
@@ -835,7 +833,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                         className="w-full mt-4 py-3 px-4 rounded-xl font-semibold text-xs tracking-wider uppercase bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-lg shadow-brand-glow flex items-center justify-center gap-2"
                       >
                         <IconCheckCircle className="w-4 h-4" />
-                        Save Server Configuration
+                        Save Channels
                       </button>
                     </form>
                   </div>
@@ -849,18 +847,18 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                       <div className="flex items-center justify-between pb-4 border-b border-surface-border mb-4">
                         <div className="flex items-center gap-2">
                           <IconFileText className="w-4 h-4 text-brand-400" />
-                          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Welcome Guide Embed</h3>
+                          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Welcome Message Preview</h3>
                         </div>
                         <button 
                           onClick={() => handleSyncEmbed("welcome")}
                           className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-sm flex items-center gap-1.5"
                         >
                           <IconRefresh className="w-3.5 h-3.5" />
-                          Sync to Discord
+                          Post to Discord
                         </button>
                       </div>
                       <pre className="flex-1 bg-surface-cardHover border border-surface-border/60 rounded-xl p-4 text-xs font-mono text-surface-muted overflow-y-auto max-h-[420px] custom-scrollbar whitespace-pre-wrap">
-                        {welcomePreview || "No welcome embed generated."}
+                        {welcomePreview || "No welcome message yet."}
                       </pre>
                     </div>
 
@@ -869,18 +867,18 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                       <div className="flex items-center justify-between pb-4 border-b border-surface-border mb-4">
                         <div className="flex items-center gap-2">
                           <IconShield className="w-4 h-4 text-brand-400" />
-                          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Server Rules Embed</h3>
+                          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Rules Message Preview</h3>
                         </div>
                         <button 
                           onClick={() => handleSyncEmbed("rules")}
                           className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all shadow-sm flex items-center gap-1.5"
                         >
                           <IconRefresh className="w-3.5 h-3.5" />
-                          Sync to Discord
+                          Post to Discord
                         </button>
                       </div>
                       <pre className="flex-1 bg-surface-cardHover border border-surface-border/60 rounded-xl p-4 text-xs font-mono text-surface-muted overflow-y-auto max-h-[420px] custom-scrollbar whitespace-pre-wrap">
-                        {rulesPreview || "No rules embed generated."}
+                        {rulesPreview || "No rules message yet."}
                       </pre>
                     </div>
                   </div>
@@ -897,9 +895,9 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                   <IconShield className="w-8 h-8 text-brand-400" />
                 </div>
                 
-                <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Enterprise Access Verification</h2>
+                <h2 className="text-xl font-bold text-white mb-2 tracking-tight">Sign In</h2>
                 <p className="text-xs text-surface-muted leading-relaxed mb-6">
-                  Sign in with your verified Discord account to manage your servers with role-based access control.
+                  Log in with Discord to manage your servers where you have Admin or Manage Server rights.
                 </p>
 
                 {/* 1-Click Discord OAuth2 */}
@@ -908,13 +906,13 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                   className="w-full py-3 px-4 rounded-xl font-semibold text-xs tracking-wider uppercase bg-[#5865F2] hover:bg-[#4752c4] text-white transition-all shadow-lg flex items-center justify-center gap-2.5"
                 >
                   <IconDiscord className="w-4 h-4" />
-                  Continue with Discord
+                  Sign In with Discord
                 </a>
 
                 {/* Divider */}
                 <div className="flex items-center my-6 gap-3 text-[11px] text-surface-muted font-mono uppercase tracking-wider">
                   <div className="flex-1 h-px bg-surface-border"></div>
-                  <span>Or Master Key</span>
+                  <span>Or use Master Passcode</span>
                   <div className="flex-1 h-px bg-surface-border"></div>
                 </div>
 
@@ -924,7 +922,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                     <IconKey className="w-4 h-4 text-surface-muted absolute left-3.5 top-3.5 pointer-events-none" />
                     <input 
                       type="password"
-                      placeholder="Enter Master Security Key"
+                      placeholder="Enter Passcode"
                       value={pinInput}
                       onChange={e => setPinInput(e.target.value)}
                       className="w-full bg-surface-cardHover border border-surface-border focus:border-brand-500 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-white placeholder-surface-muted outline-none transition-colors"
@@ -934,7 +932,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
                     type="submit" 
                     className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs tracking-wider uppercase bg-surface-cardHover border border-surface-border hover:border-surface-borderLight text-white transition-all"
                   >
-                    Authenticate with Key
+                    Sign In with Passcode
                   </button>
                 </form>
               </div>
@@ -1255,7 +1253,7 @@ class DashboardCog(commands.Cog):
             try:
                 desc_text = f"You have received an official moderation action in **{guild.name}**.\n\n**Action:** `{action}`\n**Reason:** {reason}\n**Moderator:** {mod_name}"
                 emb = discord.Embed(
-                    title=f"Notice • {guild.name}",
+                    title=f"Notice from {guild.name}",
                     description=desc_text,
                     color=color_hex,
                     timestamp=datetime.now(timezone.utc)
