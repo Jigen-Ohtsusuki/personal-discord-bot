@@ -38,6 +38,14 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    // Suppress benign CDN advisory notices in dev console
+    const _origWarn = console.warn;
+    console.warn = function(...args) {
+      if (typeof args[0] === 'string' && (args[0].includes('cdn.tailwindcss.com') || args[0].includes('Babel transformer'))) return;
+      _origWarn.apply(console, args);
+    };
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -90,6 +98,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
 
   <script type="text/babel">
     const { useState, useEffect, useMemo, useCallback } = React;
+    const MISSJEY_AVATAR = "https://yt3.googleusercontent.com/O143rEtFVDnaNLx5zkY4QcYIXpKuUMIWkAN_m7ZJeuE5qCGhPMXJqWzHhiChGeJtWZq_lEFKkQ=s900-c-k-c0x00ffffff-no-rj";
 
     // --- Clean Vector Icons (No Emojis) ---
     const IconShield = ({ className = "w-4 h-4" }) => (
