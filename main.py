@@ -53,7 +53,8 @@ class GamingBot(commands.Bot):
             "cogs.notification_roles",
             "cogs.welcome",
             "cogs.rules",
-            "cogs.moderation"
+            "cogs.moderation",
+            "cogs.dashboard"
         ]
 
         for extension in initial_extensions:
