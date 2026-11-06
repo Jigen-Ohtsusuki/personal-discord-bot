@@ -301,7 +301,7 @@ HTML_DASHBOARD = r"""<!DOCTYPE html>
           });
           const data = await res.json();
           if (data.success) {
-            addToast('success', `Executed ${modAction} (Case #${data.case_id})`);
+            const dmNote = data.dm_sent ? ' • DM sent to member' : (data.action === 'WARN' ? ' • Member DMs closed' : ''); addToast('success', `Executed ${modAction} (Case #${data.case_id})${dmNote}`);
             setModReason("");
             fetchGuildData(selectedGuildId);
           } else {
@@ -1246,21 +1246,33 @@ class DashboardCog(commands.Cog):
 
         mod_name = sess["user"]["name"]
         mod_id = sess["user"]["id"]
-        mod_cog = self.bot.get_cog("ModerationCog")
+        mod_cog = self.bot.get_cog("Moderation") or self.bot.get_cog("ModerationCog")
         fake_mod = guild.get_member(int(mod_id)) if mod_id.isdigit() else self.bot.user
+
+        async def send_direct_dm(action_title: str, color_hex: int, note: str = None) -> bool:
+            if not target:
+                return False
+            try:
+                desc_text = f"You have received an official moderation action in **{guild.name}**.\n\n**Action:** `{action}`\n**Reason:** {reason}\n**Moderator:** {mod_name}"
+                emb = discord.Embed(
+                    title=f"Notice • {guild.name}",
+                    description=desc_text,
+                    color=color_hex,
+                    timestamp=datetime.now(timezone.utc)
+                )
+                if note:
+                    emb.add_field(name="Additional Info", value=note, inline=False)
+                emb.set_footer(text="If you believe this was an error, please contact server leadership.")
+                await target.send(embed=emb)
+                return True
+            except Exception as e:
+                logger.warning(f"Could not send DM to {target} ({target.id}): {e}")
+                return False
 
         try:
             if action == "TIMEOUT":
                 duration = parse_duration(duration_str)
-                # DM Target
-                if mod_cog and target:
-                    await mod_cog.send_user_dm(
-                        target,
-                        action_name="Timed Out",
-                        color=0xFEE75C,
-                        reason=reason,
-                        extra_field=("Duration", duration_str)
-                    )
+                await send_direct_dm("Timeout", 0xFEE75C, f"Duration: {duration_str}")
                 await target.timeout(duration, reason=f"[{mod_name}] {reason}")
                 case_id = await db.log_mod_action(
                     guild_id=str(guild.id),
@@ -1283,7 +1295,7 @@ class DashboardCog(commands.Cog):
                         duration=duration_str,
                         case_id=case_id
                     )
-                return web.json_response({"success": True, "case_id": case_id})
+                return web.json_response({"success": True, "case_id": case_id, "dm_sent": True})
 
             elif action == "REMOVE_TIMEOUT":
                 await target.timeout(None, reason=f"[{mod_name}] {reason}")
@@ -1320,14 +1332,8 @@ class DashboardCog(commands.Cog):
                     reason=reason
                 )
                 
-                dm_sent = False
-                if mod_cog and target:
-                    dm_sent = await mod_cog.send_user_dm(
-                        target,
-                        action_name="Warned",
-                        color=0xF1C40F,
-                        reason=reason
-                    )
+                dm_sent = await send_direct_dm("Formal Warning", 0xF1C40F, f"Case ID: #{case_id}")
+                if mod_cog:
                     await mod_cog.send_audit_log(
                         guild=guild,
                         action_name="Member Warned",
@@ -1340,13 +1346,7 @@ class DashboardCog(commands.Cog):
                 return web.json_response({"success": True, "case_id": case_id, "dm_sent": dm_sent})
 
             elif action == "KICK":
-                if mod_cog and target:
-                    await mod_cog.send_user_dm(
-                        target,
-                        action_name="Kicked",
-                        color=0xE67E22,
-                        reason=reason
-                    )
+                await send_direct_dm("Kick", 0xE67E22)
                 await target.kick(reason=f"[{mod_name}] {reason}")
                 case_id = await db.log_mod_action(
                     guild_id=str(guild.id),
@@ -1367,16 +1367,10 @@ class DashboardCog(commands.Cog):
                         reason=reason,
                         case_id=case_id
                     )
-                return web.json_response({"success": True, "case_id": case_id})
+                return web.json_response({"success": True, "case_id": case_id, "dm_sent": True})
 
             elif action == "BAN":
-                if mod_cog and target:
-                    await mod_cog.send_user_dm(
-                        target,
-                        action_name="Banned",
-                        color=0xED4245,
-                        reason=reason
-                    )
+                await send_direct_dm("Ban", 0xED4245)
                 await guild.ban(discord.Object(id=target_id), reason=f"[{mod_name}] {reason}")
                 case_id = await db.log_mod_action(
                     guild_id=str(guild.id),
@@ -1397,7 +1391,7 @@ class DashboardCog(commands.Cog):
                         reason=reason,
                         case_id=case_id
                     )
-                return web.json_response({"success": True, "case_id": case_id})
+                return web.json_response({"success": True, "case_id": case_id, "dm_sent": True})
 
             else:
                 return web.json_response({"success": False, "error": f"Unknown action: {action}"})
