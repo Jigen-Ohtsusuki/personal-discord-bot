@@ -80,6 +80,26 @@ class Database:
                 )
             """)
 
+            # Schema Migration for server_settings
+            async with db.execute("PRAGMA table_info(server_settings)") as cursor:
+                existing_cols = {row[1] for row in await cursor.fetchall()}
+            
+            settings_cols = [
+                ("welcome_channel_id", "TEXT"),
+                ("rules_channel_id", "TEXT"),
+                ("mod_log_channel_id", "TEXT"),
+                ("stream_channel_id", "TEXT"),
+                ("video_channel_id", "TEXT"),
+                ("stream_ping_role_id", "TEXT"),
+                ("updated_at", "TEXT")
+            ]
+            for col_name, col_type in settings_cols:
+                if col_name not in existing_cols:
+                    try:
+                        await db.execute(f"ALTER TABLE server_settings ADD COLUMN {col_name} {col_type}")
+                    except Exception:
+                        pass
+
             await db.commit()
 
     async def add_subscription(

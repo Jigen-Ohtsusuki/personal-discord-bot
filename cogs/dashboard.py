@@ -1246,11 +1246,22 @@ class DashboardCog(commands.Cog):
 
         mod_name = sess["user"]["name"]
         mod_id = sess["user"]["id"]
+        mod_cog = self.bot.get_cog("ModerationCog")
+        fake_mod = guild.get_member(int(mod_id)) if mod_id.isdigit() else self.bot.user
 
         try:
             if action == "TIMEOUT":
                 duration = parse_duration(duration_str)
-                await target.timeout(duration, reason=reason)
+                # DM Target
+                if mod_cog and target:
+                    await mod_cog.send_user_dm(
+                        target,
+                        action_name="Timed Out",
+                        color=0xFEE75C,
+                        reason=reason,
+                        extra_field=("Duration", duration_str)
+                    )
+                await target.timeout(duration, reason=f"[{mod_name}] {reason}")
                 case_id = await db.log_mod_action(
                     guild_id=str(guild.id),
                     action="TIMEOUT",
@@ -1261,10 +1272,21 @@ class DashboardCog(commands.Cog):
                     reason=reason,
                     duration=duration_str
                 )
+                if mod_cog:
+                    await mod_cog.send_audit_log(
+                        guild=guild,
+                        action_name="Timeout Applied",
+                        color=0xFEE75C,
+                        target=target,
+                        moderator=fake_mod or self.bot.user,
+                        reason=reason,
+                        duration=duration_str,
+                        case_id=case_id
+                    )
                 return web.json_response({"success": True, "case_id": case_id})
 
             elif action == "REMOVE_TIMEOUT":
-                await target.timeout(None, reason=reason)
+                await target.timeout(None, reason=f"[{mod_name}] {reason}")
                 case_id = await db.log_mod_action(
                     guild_id=str(guild.id),
                     action="REMOVE_TIMEOUT",
@@ -1274,6 +1296,16 @@ class DashboardCog(commands.Cog):
                     moderator_name=mod_name,
                     reason=reason
                 )
+                if mod_cog:
+                    await mod_cog.send_audit_log(
+                        guild=guild,
+                        action_name="Timeout Removed",
+                        color=0x57F287,
+                        target=target,
+                        moderator=fake_mod or self.bot.user,
+                        reason=reason,
+                        case_id=case_id
+                    )
                 return web.json_response({"success": True, "case_id": case_id})
 
             elif action == "WARN":
@@ -1287,10 +1319,35 @@ class DashboardCog(commands.Cog):
                     moderator_name=mod_name,
                     reason=reason
                 )
-                return web.json_response({"success": True, "case_id": case_id})
+                
+                dm_sent = False
+                if mod_cog and target:
+                    dm_sent = await mod_cog.send_user_dm(
+                        target,
+                        action_name="Warned",
+                        color=0xF1C40F,
+                        reason=reason
+                    )
+                    await mod_cog.send_audit_log(
+                        guild=guild,
+                        action_name="Member Warned",
+                        color=0xF1C40F,
+                        target=target,
+                        moderator=fake_mod or self.bot.user,
+                        reason=reason,
+                        case_id=case_id
+                    )
+                return web.json_response({"success": True, "case_id": case_id, "dm_sent": dm_sent})
 
             elif action == "KICK":
-                await target.kick(reason=reason)
+                if mod_cog and target:
+                    await mod_cog.send_user_dm(
+                        target,
+                        action_name="Kicked",
+                        color=0xE67E22,
+                        reason=reason
+                    )
+                await target.kick(reason=f"[{mod_name}] {reason}")
                 case_id = await db.log_mod_action(
                     guild_id=str(guild.id),
                     action="KICK",
@@ -1300,10 +1357,27 @@ class DashboardCog(commands.Cog):
                     moderator_name=mod_name,
                     reason=reason
                 )
+                if mod_cog:
+                    await mod_cog.send_audit_log(
+                        guild=guild,
+                        action_name="Member Kicked",
+                        color=0xE67E22,
+                        target=target,
+                        moderator=fake_mod or self.bot.user,
+                        reason=reason,
+                        case_id=case_id
+                    )
                 return web.json_response({"success": True, "case_id": case_id})
 
             elif action == "BAN":
-                await guild.ban(discord.Object(id=target_id), reason=reason)
+                if mod_cog and target:
+                    await mod_cog.send_user_dm(
+                        target,
+                        action_name="Banned",
+                        color=0xED4245,
+                        reason=reason
+                    )
+                await guild.ban(discord.Object(id=target_id), reason=f"[{mod_name}] {reason}")
                 case_id = await db.log_mod_action(
                     guild_id=str(guild.id),
                     action="BAN",
@@ -1313,6 +1387,16 @@ class DashboardCog(commands.Cog):
                     moderator_name=mod_name,
                     reason=reason
                 )
+                if mod_cog:
+                    await mod_cog.send_audit_log(
+                        guild=guild,
+                        action_name="Member Banned",
+                        color=0xED4245,
+                        target=target or discord.Object(id=target_id),
+                        moderator=fake_mod or self.bot.user,
+                        reason=reason,
+                        case_id=case_id
+                    )
                 return web.json_response({"success": True, "case_id": case_id})
 
             else:
