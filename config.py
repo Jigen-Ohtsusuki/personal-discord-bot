@@ -26,3 +26,9 @@ NOTIFICATION_CHANNEL_NAME = os.getenv("NOTIFICATION_CHANNEL_NAME", "").strip()
 CALLBACK_URL = os.getenv("CALLBACK_URL", "").strip().rstrip("/")
 WEBHOOK_PORT = int(os.getenv("WEBHOOK_PORT", "8080"))
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "").strip()
+
+# Dashboard & Discord OAuth2 Authentication
+DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID", "1566009195675914260").strip()
+DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET", "").strip()
+DASHBOARD_PIN = os.getenv("DASHBOARD_PIN", "jey2026").strip()
+DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "5000"))

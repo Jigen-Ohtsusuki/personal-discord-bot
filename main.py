@@ -66,16 +66,30 @@ class GamingBot(commands.Bot):
 
         # 3. Sync Slash Commands & Context Menus
         try:
+            for g in self.guilds:
+                try:
+                    self.tree.copy_global_to(guild=g)
+                    await self.tree.sync(guild=g)
+                except Exception:
+                    pass
             if config.GUILD_ID:
                 guild_obj = discord.Object(id=int(config.GUILD_ID))
                 self.tree.copy_global_to(guild=guild_obj)
                 synced = await self.tree.sync(guild=guild_obj)
-                logger.info(f"✨ Synced {len(synced)} commands instantly to guild {config.GUILD_ID}!")
-            else:
-                synced = await self.tree.sync()
-                logger.info(f"✨ Synced {len(synced)} commands globally!")
+                logger.info(f"✨ Synced {len(synced)} commands instantly to primary guild {config.GUILD_ID}!")
+            synced_global = await self.tree.sync()
+            logger.info(f"✨ Synced {len(synced_global)} commands globally!")
         except Exception as e:
             logger.error(f"Command tree sync error: {e}", exc_info=True)
+
+    async def on_guild_join(self, guild: discord.Guild):
+        logger.info(f"🎉 Joined new guild: {guild.name} ({guild.id})")
+        try:
+            self.tree.copy_global_to(guild=guild)
+            synced = await self.tree.sync(guild=guild)
+            logger.info(f"✨ Instantly synced {len(synced)} commands to new guild: {guild.name}")
+        except Exception as e:
+            logger.error(f"Failed to sync commands to new guild {guild.id}: {e}")
 
     async def on_ready(self):
         logger.info(f"=======================================")

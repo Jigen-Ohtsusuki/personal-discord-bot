@@ -43,7 +43,14 @@ class Database:
                 CREATE TABLE IF NOT EXISTS server_settings (
                     guild_id TEXT PRIMARY KEY,
                     dashboard_enabled INTEGER DEFAULT 1,
-                    created_at TEXT NOT NULL
+                    welcome_channel_id TEXT,
+                    rules_channel_id TEXT,
+                    mod_log_channel_id TEXT,
+                    stream_channel_id TEXT,
+                    video_channel_id TEXT,
+                    stream_ping_role_id TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
             """)
 
@@ -265,5 +272,51 @@ class Database:
             """, (str(guild_id), str(user_id))) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
+
+    async def get_mod_logs(self, guild_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieves moderation logs for a specific guild."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("""
+                SELECT * FROM mod_logs WHERE guild_id = ? ORDER BY id DESC LIMIT ?
+            """, (str(guild_id), limit)) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+
+    async def get_server_settings(self, guild_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves settings for a specific guild."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("""
+                SELECT * FROM server_settings WHERE guild_id = ?
+            """, (str(guild_id),)) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
+    async def update_server_settings(self, guild_id: str, **kwargs) -> bool:
+        """Upsert settings for a specific guild."""
+        now = datetime.now(timezone.utc).isoformat()
+        current = await self.get_server_settings(guild_id)
+        async with aiosqlite.connect(self.db_path) as db:
+            if not current:
+                fields = ["guild_id", "created_at", "updated_at"]
+                values = [str(guild_id), now, now]
+                for k, v in kwargs.items():
+                    fields.append(k)
+                    values.append(v)
+                placeholders = ", ".join(["?"] * len(fields))
+                query = f"INSERT INTO server_settings ({', '.join(fields)}) VALUES ({placeholders})"
+                await db.execute(query, tuple(values))
+            else:
+                fields = ["updated_at = ?"]
+                values = [now]
+                for k, v in kwargs.items():
+                    fields.append(f"{k} = ?")
+                    values.append(v)
+                values.append(str(guild_id))
+                query = f"UPDATE server_settings SET {', '.join(fields)} WHERE guild_id = ?"
+                await db.execute(query, tuple(values))
+            await db.commit()
+            return True
 
 db = Database()
